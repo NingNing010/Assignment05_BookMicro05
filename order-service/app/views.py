@@ -86,12 +86,31 @@ class OrderDetail(APIView):
         serializer = OrderSerializer(order)
         return Response(serializer.data)
 
+    # Valid status transitions
+    TRANSITIONS = {
+        'pending':   ['confirmed', 'cancelled'],
+        'confirmed': ['shipped', 'cancelled'],
+        'shipped':   ['delivered'],
+        'delivered': [],
+        'cancelled': [],
+    }
+
     def patch(self, request, order_id):
         """Update order status: {"status": "confirmed"}"""
         try:
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
             return Response({"error": "Order not found"}, status=404)
+
+        new_status = request.data.get('status')
+        if new_status:
+            allowed = self.TRANSITIONS.get(order.status, [])
+            if new_status not in allowed:
+                return Response(
+                    {"error": f"Cannot change from '{order.status}' to '{new_status}'. Allowed: {allowed}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         serializer = OrderSerializer(order, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

@@ -150,7 +150,8 @@
                             <div class="order-footer">
                                 <div class="order-total">Tổng: ${formatPrice(o.total_amount)} ₫</div>
                                 <div class="order-actions">
-                                    ${o.status === 'pending' ? `<button class="btn btn-danger btn-sm" onclick="cancelOrder(${o.id})">❌ Hủy đơn</button>` : ''}
+                                    ${o.status === 'shipped' ? `<button class="btn btn-success btn-sm" onclick="updateOrder(${o.id},'delivered')">📬 Đã nhận hàng</button>` : ''}
+                                    ${o.status === 'pending' ? `<button class="btn btn-danger btn-sm" onclick="updateOrder(${o.id},'cancelled')">❌ Hủy đơn</button>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -168,12 +169,23 @@
         }
     }
 
-    async function cancelOrder(orderId) {
-        if (!confirm('Bạn có chắc muốn hủy đơn hàng này?')) return;
+    async function updateOrder(orderId, newStatus) {
+        const msgs = { cancelled: 'Bạn có chắc muốn hủy đơn hàng này?', delivered: 'Xác nhận đã nhận hàng?' };
+        if (!confirm(msgs[newStatus] || 'Xác nhận?')) return;
         try {
-            await fetch(`/api/proxy/orders/${orderId}/`, { method: 'DELETE' });
-            showToast('Đã hủy đơn hàng');
-            loadOrders();
+            const res = await fetch(`/api/proxy/orders/${orderId}/`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: newStatus})
+            });
+            if (res.ok) {
+                const labels = { cancelled: 'Đã hủy đơn hàng', delivered: 'Đã xác nhận nhận hàng! 📬' };
+                showToast(labels[newStatus] || 'Cập nhật thành công');
+                loadOrders();
+            } else {
+                const err = await res.json();
+                showToast(err.error || 'Lỗi cập nhật', 'error');
+            }
         } catch(e) {
             showToast('Lỗi: ' + e.message, 'error');
         }

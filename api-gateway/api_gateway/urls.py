@@ -5,25 +5,33 @@ from . import views
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # Dashboard
-    path('', views.dashboard, name='dashboard'),
+    # ── Customer-facing Store (homepage) ──
+    path('', views.store_home, name='store_home'),
+    path('store/', views.store_home, name='store_home_alt'),
+    path('store/books/', views.store_books, name='store_books'),
+    path('store/book/<int:book_id>/', views.store_book_detail, name='store_book_detail'),
+    path('store/cart/', views.store_cart, name='store_cart'),
+    path('store/orders/', views.store_orders, name='store_orders'),
+    path('store/login/', views.store_login, name='store_login'),
+    path('store/register/', views.store_register, name='store_register'),
 
-    # Page views
-    path('books/', views.book_list, name='book_list'),
-    path('publishers/', views.publisher_list, name='publisher_list'),
-    path('cart/<int:customer_id>/', views.view_cart, name='view_cart'),
-    path('customers/', views.customer_list, name='customer_list'),
-    path('orders/', views.order_list, name='order_list'),
-    path('payments/', views.payment_list, name='payment_list'),
-    path('shipments/', views.shipment_list, name='shipment_list'),
-    path('reviews/', views.review_list, name='review_list'),
-    path('categories/', views.category_list, name='category_list'),
-    path('recommendations/<int:customer_id>/', views.recommendations, name='recommendations'),
-    path('staff/', views.staff_list, name='staff_list'),
-    path('managers/', views.manager_list, name='manager_list'),
+    # ── Admin Panel ──
+    path('admin-panel/', views.dashboard, name='dashboard'),
+    path('admin-panel/books/', views.book_list, name='book_list'),
+    path('admin-panel/publishers/', views.publisher_list, name='publisher_list'),
+    path('admin-panel/cart/<int:customer_id>/', views.view_cart, name='view_cart'),
+    path('admin-panel/customers/', views.customer_list, name='customer_list'),
+    path('admin-panel/orders/', views.order_list, name='order_list'),
+    path('admin-panel/payments/', views.payment_list, name='payment_list'),
+    path('admin-panel/shipments/', views.shipment_list, name='shipment_list'),
+    path('admin-panel/reviews/', views.review_list, name='review_list'),
+    path('admin-panel/categories/', views.category_list, name='category_list'),
+    path('admin-panel/recommendations/<int:customer_id>/', views.recommendations, name='recommendations'),
+    path('admin-panel/staff/', views.staff_list, name='staff_list'),
+    path('admin-panel/managers/', views.manager_list, name='manager_list'),
 
-    # AI Agent
-    path('agent/', views.agent_chat_page, name='agent_chat'),
+    # AI Agent (under admin panel)
+    path('admin-panel/agent/', views.agent_chat_page, name='agent_chat'),
     path('api/agent/chat/', views.agent_chat_api, name='agent_chat_api'),
     path('api/agent/help/', views.agent_help_api, name='agent_help_api'),
 

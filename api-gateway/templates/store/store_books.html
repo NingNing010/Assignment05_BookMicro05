@@ -1,0 +1,168 @@
+{% extends "store/store_base.html" %}
+{% block title %}Tất cả sách{% endblock %}
+{% block nav_books %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+    }
+
+    .filter-chip {
+        padding: 8px 18px;
+        border-radius: 24px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid var(--border);
+        background: var(--bg-white);
+        color: var(--text-body);
+        font-family: inherit;
+    }
+
+    .filter-chip:hover { border-color: var(--navy); }
+    .filter-chip.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+    .sort-select {
+        margin-left: auto;
+        padding: 8px 16px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-family: inherit;
+        color: var(--text-dark);
+        cursor: pointer;
+        outline: none;
+        background: var(--bg-white);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="section-header">
+        <div>
+            <div class="section-title">📚 Tất cả sách</div>
+            <div class="section-subtitle" id="bookCount">Đang tải...</div>
+        </div>
+    </div>
+
+    <div class="filter-bar" id="filterBar">
+        <button class="filter-chip active" onclick="filterCategory(null, this)">Tất cả</button>
+        <select class="sort-select" id="sortSelect" onchange="applySort()">
+            <option value="newest">Mới nhất</option>
+            <option value="price-low">Giá thấp → cao</option>
+            <option value="price-high">Giá cao → thấp</option>
+            <option value="name">Tên A → Z</option>
+        </select>
+    </div>
+
+    <div class="books-grid" id="booksGrid">
+        <div class="spinner"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allBooks = [];
+    let currentFilter = null;
+
+    async function loadData() {
+        try {
+            const [booksRes, catsRes] = await Promise.all([
+                fetch('/api/proxy/books/'),
+                fetch('/api/proxy/categories/')
+            ]);
+            allBooks = await booksRes.json();
+            const categories = await catsRes.json();
+
+            // Add category chips
+            const bar = document.getElementById('filterBar');
+            const sortSel = bar.querySelector('.sort-select');
+            (Array.isArray(categories) ? categories : []).forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'filter-chip';
+                btn.textContent = c.name;
+                btn.onclick = function() { filterCategory(c.name, this); };
+                bar.insertBefore(btn, sortSel);
+            });
+
+            renderBooks(allBooks);
+        } catch(e) {
+            document.getElementById('booksGrid').innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">😢</div>
+                    <div class="empty-title">Không thể tải dữ liệu</div>
+                </div>`;
+        }
+    }
+
+    function filterCategory(cat, btn) {
+        currentFilter = cat;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        applySort();
+    }
+
+    function applySort() {
+        let books = currentFilter ? allBooks.filter(b => b.category_name === currentFilter) : [...allBooks];
+        const sort = document.getElementById('sortSelect').value;
+        switch(sort) {
+            case 'price-low': books.sort((a,b) => a.price - b.price); break;
+            case 'price-high': books.sort((a,b) => b.price - a.price); break;
+            case 'name': books.sort((a,b) => a.title.localeCompare(b.title)); break;
+            default: books.sort((a,b) => (b.id || 0) - (a.id || 0));
+        }
+        renderBooks(books);
+    }
+
+    function renderBooks(books) {
+        document.getElementById('bookCount').textContent = `${books.length} tựa sách`;
+        const grid = document.getElementById('booksGrid');
+
+        if (books.length === 0) {
+            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📚</div><div class="empty-title">Không có sách nào</div></div>`;
+            return;
+        }
+
+        grid.innerHTML = books.map((b, i) => {
+            const stockClass = b.stock > 5 ? 'in-stock' : b.stock > 0 ? 'low-stock' : 'out-of-stock';
+            const stockText = b.stock > 5 ? 'Còn hàng' : b.stock > 0 ? `Còn ${b.stock}` : 'Hết hàng';
+            return `
+                <div class="book-card" onclick="window.location='/store/book/${b.id}/'">
+                    <div class="book-card-cover ${gradClass(i)}">
+                        <div class="book-icon">📖</div>
+                        ${b.category_name ? `<span class="category-tag">${b.category_name}</span>` : ''}
+                        <span class="stock-tag ${stockClass}">${stockText}</span>
+                    </div>
+                    <div class="book-card-body">
+                        <div class="book-card-title">${b.title}</div>
+                        <div class="book-card-author">✍️ ${b.author}</div>
+                        <div class="book-card-footer">
+                            <div class="book-card-price">${formatPrice(b.price)} <span class="currency">₫</span></div>
+                            <button class="btn-add-cart" onclick="event.stopPropagation();addToCart(${b.id})">🛒 Thêm</button>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    async function addToCart(bookId) {
+        const c = getCustomer();
+        if (!c) { window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname); return; }
+        try {
+            await apiCall('/api/proxy/cart-items/', 'POST', { cart: c.cart_id || c.id, book_id: bookId, quantity: 1 });
+            showToast('Đã thêm vào giỏ hàng! 🛒');
+            loadCartCount();
+        } catch(e) { showToast('Lỗi: ' + e.message, 'error'); }
+    }
+
+    loadData();
+</script>
+{% endblock %}

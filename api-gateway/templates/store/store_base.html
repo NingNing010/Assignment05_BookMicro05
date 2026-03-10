@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BookStore{% endblock %}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        :root {
+            --navy: #1a1a2e;
+            --navy-light: #16213e;
+            --navy-dark: #0f0f1a;
+            --accent: #e94560;
+            --accent-hover: #ff6b81;
+            --gold: #f5a623;
+            --gold-hover: #ffbd45;
+            --green: #2ecc71;
+            --blue: #3498db;
+            --purple: #9b59b6;
+            --orange: #f39c12;
+            --text-dark: #222;
+            --text-body: #555;
+            --text-muted: #999;
+            --bg-light: #f8f9fc;
+            --bg-white: #fff;
+            --border: #e8e8f0;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 48px rgba(0,0,0,0.12);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+
+        a { text-decoration: none; color: inherit; }
+
+        /* ── Top Navbar ── */
+        .navbar {
+            background: var(--navy);
+            padding: 0 40px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .nav-brand .books-icon {
+            display: flex;
+            gap: 3px;
+        }
+
+        .nav-brand .book-bar {
+            width: 10px;
+            height: 22px;
+            border-radius: 2px;
+        }
+
+        .nav-brand .book-bar:nth-child(1) { background: var(--gold); }
+        .nav-brand .book-bar:nth-child(2) { background: var(--accent); }
+
+        .nav-brand span:last-child { color: var(--gold); }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link {
+            color: #ccc;
+            font-size: 0.88rem;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: #fff;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .nav-link .icon { margin-right: 6px; }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--green);
+            font-size: 0.88rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            background: rgba(46,204,113,0.1);
+        }
+
+        .nav-cart-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #ccc;
+            font-size: 0.88rem;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .nav-cart-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+        .cart-badge {
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 10px;
+            position: absolute;
+            top: 2px;
+            right: 4px;
+        }
+
+        .nav-auth-btn {
+            padding: 8px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-login {
+            background: transparent;
+            color: #ccc;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-login:hover { color: #fff; border-color: #fff; }
+
+        .btn-register {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-register:hover { background: var(--accent-hover); }
+
+        .btn-logout {
+            background: transparent;
+            color: #999;
+            font-size: 1.1rem;
+            padding: 8px 12px;
+            cursor: pointer;
+            border: none;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }
+
+        .btn-logout:hover { color: var(--accent); background: rgba(233,69,96,0.1); }
+
+        /* ── Alert Banner ── */
+        .alert-banner {
+            padding: 14px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.88rem;
+            font-weight: 500;
+            animation: slideDown 0.3s ease;
+        }
+
+        .alert-banner.success { background: #e8f8f0; color: #1a7d48; }
+        .alert-banner.error { background: #fde8e8; color: #c0392b; }
+        .alert-banner.info { background: #e8f0fd; color: #2471a3; }
+
+        .alert-banner .alert-close {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .alert-banner .alert-close:hover { opacity: 1; }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* ── Main Content ── */
+        .page-content {
+            min-height: calc(100vh - 64px - 80px);
+        }
+
+        /* ── Section ── */
+        .section {
+            padding: 48px 40px;
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--text-dark);
+        }
+
+        .section-subtitle {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .section-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #fff3e0;
+            color: var(--orange);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 20px;
+        }
+
+        /* ── Book Cards Grid ── */
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .book-card {
+            background: var(--bg-white);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .book-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .book-card-cover {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .book-card-cover .book-icon {
+            width: 70px;
+            height: 90px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.3);
+            border: 2px solid rgba(255,255,255,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .book-card-cover .category-tag {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.4);
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .book-card-cover .stock-tag {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .stock-tag.in-stock { background: rgba(46,204,113,0.2); color: var(--green); }
+        .stock-tag.low-stock { background: rgba(243,156,18,0.2); color: var(--orange); }
+        .stock-tag.out-of-stock { background: rgba(233,69,96,0.2); color: var(--accent); }
+
+        .book-card-body {
+            padding: 20px;
+        }
+
+        .book-card-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--text-dark);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .book-card-author {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .book-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .book-card-price {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .book-card-price .currency {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .btn-add-cart {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--gold);
+            color: var(--navy);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-add-cart:hover { background: var(--gold-hover); transform: scale(1.05); }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 12px 28px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary { background: var(--gold); color: var(--navy); }
+        .btn-primary:hover { background: var(--gold-hover); }
+        .btn-danger { background: var(--accent); color: #fff; }
+        .btn-danger:hover { background: var(--accent-hover); }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text-dark); }
+        .btn-outline:hover { border-color: var(--text-dark); }
+        .btn-navy { background: var(--navy); color: #fff; }
+        .btn-navy:hover { background: var(--navy-light); }
+        .btn-sm { padding: 8px 18px; font-size: 0.82rem; }
+        .btn-lg { padding: 14px 36px; font-size: 1rem; }
+        .btn-block { width: 100%; justify-content: center; }
+
+        /* ── Form Controls ── */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-white);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-dark);
+            font-size: 0.9rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus { border-color: var(--gold); }
+
+        .form-control::placeholder { color: var(--text-muted); }
+
+        /* ── Card ── */
+        .card {
+            background: var(--bg-white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .card-body { padding: 24px; }
+
+        /* ── Table ── */
+        .table-wrapper {
+            background: var(--bg-white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            padding: 14px 20px;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            background: var(--bg-light);
+            border-bottom: 2px solid var(--border);
+        }
+
+        td {
+            padding: 16px 20px;
+            font-size: 0.88rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-body);
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        tr:hover { background: #fafbfe; }
+
+        /* ── Tag / Badge ── */
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .tag-green { background: #e8f8f0; color: #1a7d48; }
+        .tag-orange { background: #fff3e0; color: #e67e22; }
+        .tag-red { background: #fde8e8; color: #c0392b; }
+        .tag-blue { background: #e8f0fd; color: #2471a3; }
+        .tag-purple { background: #f3e8fd; color: #8e44ad; }
+        .tag-navy { background: #e8eaf6; color: var(--navy); }
+
+        /* ── Rating Stars ── */
+        .stars { color: var(--gold); letter-spacing: 2px; }
+
+        /* ── Footer ── */
+        .store-footer {
+            background: var(--navy);
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .footer-brand span:last-child { color: var(--gold); }
+
+        .footer-link {
+            color: #888;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover { color: #fff; }
+
+        .footer-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state .empty-icon { font-size: 3rem; margin-bottom: 16px; }
+        .empty-state .empty-title { font-size: 1.1rem; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; }
+        .empty-state .empty-desc { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 20px; }
+
+        /* ── Loading Spinner ── */
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--gold);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 40px auto;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .navbar { padding: 0 16px; }
+            .section { padding: 32px 16px; }
+            .books-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .nav-links { display: none; }
+            .store-footer { flex-direction: column; gap: 12px; text-align: center; }
+        }
+
+        @media (max-width: 480px) {
+            .books-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ── Gradient helpers ── */
+        .grad-1 { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .grad-2 { background: linear-gradient(135deg, #2ecc71, #3498db); }
+        .grad-3 { background: linear-gradient(135deg, #e94560, #9b59b6); }
+        .grad-4 { background: linear-gradient(135deg, #f39c12, #e74c3c); }
+        .grad-5 { background: linear-gradient(135deg, #1abc9c, #2c3e50); }
+        .grad-6 { background: linear-gradient(135deg, #3498db, #8e44ad); }
+
+        /* Toast notification */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 14px 24px;
+            border-radius: var(--radius-sm);
+            font-size: 0.88rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+            max-width: 360px;
+        }
+
+        .toast.success { background: #e8f8f0; color: #1a7d48; border-left: 4px solid var(--green); }
+        .toast.error { background: #fde8e8; color: #c0392b; border-left: 4px solid var(--accent); }
+
+        @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(100%); } }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/store/" class="nav-brand">
+                <span class="books-icon">
+                    <span class="book-bar"></span>
+                    <span class="book-bar"></span>
+                </span>
+                <span>Book</span><span>Store</span>
+            </a>
+            <div class="nav-links">
+                <a href="/store/" class="nav-link {% block nav_home %}{% endblock %}"><span class="icon">🏠</span> Trang chủ</a>
+                <a href="/store/books/" class="nav-link {% block nav_books %}{% endblock %}"><span class="icon">📚</span> Sách</a>
+            </div>
+        </div>
+        <div class="nav-right" id="navRight">
+            <!-- Populated by JS based on login state -->
+        </div>
+    </nav>
+
+    <!-- Alert area -->
+    <div id="alertArea"></div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Page Content -->
+    <div class="page-content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="store-footer">
+        <div class="footer-left">
+            <div class="footer-brand">
+                <span>📚</span> <span>Book</span><span>Store</span>
+            </div>
+            <a href="/store/" class="footer-link">🏠 Trang chủ</a>
+        </div>
+        <div class="footer-right">
+            <span id="footerUser"></span>
+            <a href="/store/orders/" class="footer-link">📦 Đơn hàng</a>
+            <a href="/store/cart/" class="footer-link">🛒 Giỏ hàng</a>
+            <a href="/admin-panel/" class="footer-link" title="Quản trị">⚙️</a>
+        </div>
+    </footer>
+
+    <script>
+        // ── Customer session management ──
+        function getCustomer() {
+            const data = localStorage.getItem('store_customer');
+            return data ? JSON.parse(data) : null;
+        }
+
+        function setCustomer(customer) {
+            localStorage.setItem('store_customer', JSON.stringify(customer));
+            renderNav();
+        }
+
+        function logout() {
+            localStorage.removeItem('store_customer');
+            window.location.href = '/store/';
+        }
+
+        function renderNav() {
+            const c = getCustomer();
+            const nav = document.getElementById('navRight');
+            const footer = document.getElementById('footerUser');
+
+            if (c) {
+                nav.innerHTML = `
+                    <a href="/store/orders/" class="nav-link {% block nav_orders %}{% endblock %}"><span class="icon">📦</span> Đơn hàng</a>
+                    <a href="/store/cart/" class="nav-cart-btn {% block nav_cart %}{% endblock %}">🛒 Giỏ hàng <span class="cart-badge" id="cartCount" style="display:none">0</span></a>
+                    <span class="nav-user">👤 ${c.full_name || c.name}</span>
+                    <button class="btn-logout" onclick="logout()" title="Đăng xuất">↪️</button>
+                `;
+                if (footer) footer.innerHTML = `<span class="footer-link" style="color:var(--green)">👤 ${c.full_name || c.name}</span>`;
+                loadCartCount();
+            } else {
+                nav.innerHTML = `
+                    <a href="/store/login/" class="nav-auth-btn btn-login">Đăng nhập</a>
+                    <a href="/store/register/" class="nav-auth-btn btn-register">Đăng ký</a>
+                `;
+                if (footer) footer.innerHTML = '';
+            }
+        }
+
+        async function loadCartCount() {
+            const c = getCustomer();
+            if (!c) return;
+            try {
+                const res = await fetch(`/api/proxy/carts/${c.id}/`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const items = data.items || data || [];
+                    const badge = document.getElementById('cartCount');
+                    if (badge && items.length > 0) {
+                        badge.textContent = items.length;
+                        badge.style.display = 'inline';
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // ── Toast ──
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const div = document.createElement('div');
+            div.className = `toast ${type}`;
+            div.textContent = msg;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        // ── Alert ──
+        function showAlert(msg, type = 'success') {
+            const area = document.getElementById('alertArea');
+            area.innerHTML = `
+                <div class="alert-banner ${type}">
+                    <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${msg}</span>
+                    <button class="alert-close" onclick="this.parentElement.remove()">✕</button>
+                </div>
+            `;
+        }
+
+        // ── API helper ──
+        async function apiCall(url, method = 'GET', body = null) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch(url, opts);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.detail || JSON.stringify(data));
+            return data;
+        }
+
+        // ── Gradient by index ──
+        function gradClass(i) {
+            return `grad-${(i % 6) + 1}`;
+        }
+
+        // ── Format price ──
+        function formatPrice(p) {
+            return parseFloat(p).toLocaleString('vi-VN');
+        }
+
+        // ── Require login ──
+        function requireLogin() {
+            if (!getCustomer()) {
+                window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
+                return false;
+            }
+            return true;
+        }
+
+        // Init nav on load
+        renderNav();
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

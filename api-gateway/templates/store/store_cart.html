@@ -1,0 +1,311 @@
+{% extends "store/store_base.html" %}
+{% block title %}Giỏ hàng{% endblock %}
+{% block nav_cart %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cart-layout {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 40px;
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 32px;
+        align-items: start;
+    }
+
+    .cart-item {
+        display: flex;
+        gap: 20px;
+        padding: 20px;
+        border-bottom: 1px solid var(--border);
+        align-items: center;
+    }
+
+    .cart-item:last-child { border-bottom: none; }
+
+    .cart-item-cover {
+        width: 80px;
+        height: 100px;
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        flex-shrink: 0;
+    }
+
+    .cart-item-info { flex: 1; }
+    .cart-item-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .cart-item-author { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 8px; }
+    .cart-item-price { font-weight: 800; color: var(--accent); font-size: 1.05rem; }
+
+    .cart-item-qty {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+    }
+
+    .cart-item-qty button {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: var(--bg-light);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background 0.2s;
+        font-family: inherit;
+        color: var(--text-dark);
+    }
+
+    .cart-item-qty button:hover { background: var(--border); }
+
+    .cart-item-qty span {
+        width: 40px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .cart-item-remove {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        transition: all 0.2s;
+    }
+
+    .cart-item-remove:hover { color: var(--accent); background: rgba(233,69,96,0.1); }
+
+    /* Summary */
+    .cart-summary {
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 28px;
+        position: sticky;
+        top: 80px;
+    }
+
+    .summary-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        font-size: 0.9rem;
+    }
+
+    .summary-row .label { color: var(--text-muted); }
+    .summary-row .value { font-weight: 600; }
+
+    .summary-total {
+        display: flex;
+        justify-content: space-between;
+        padding-top: 16px;
+        margin-top: 16px;
+        border-top: 2px solid var(--border);
+        font-size: 1.15rem;
+        font-weight: 800;
+    }
+
+    .summary-total .total-price { color: var(--accent); }
+
+    .checkout-actions {
+        margin-top: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    @media (max-width: 768px) {
+        .cart-layout { grid-template-columns: 1fr; padding: 20px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="section" style="padding-bottom:0">
+    <div class="section-header">
+        <div>
+            <div class="section-title">🛒 Giỏ hàng</div>
+            <div class="section-subtitle" id="cartSubtitle">Đang tải...</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="clearCart()">🗑️ Xóa tất cả</button>
+    </div>
+</div>
+<div class="cart-layout" id="cartLayout">
+    <div class="spinner"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let cartItems = [];
+    let booksMap = {};
+
+    async function loadCart() {
+        const c = getCustomer();
+        if (!c) { window.location.href = '/store/login/?next=/store/cart/'; return; }
+
+        try {
+            const [cartRes, booksRes] = await Promise.all([
+                fetch(`/api/proxy/carts/${c.id}/`),
+                fetch('/api/proxy/books/')
+            ]);
+
+            const cartData = await cartRes.json();
+            const books = await booksRes.json();
+
+            // Build books map
+            (Array.isArray(books) ? books : []).forEach(b => booksMap[b.id] = b);
+
+            // cartData might be {items: [...]} or directly an array
+            cartItems = cartData.items || cartData || [];
+            if (!Array.isArray(cartItems)) cartItems = [];
+
+            renderCart();
+        } catch(e) {
+            document.getElementById('cartLayout').innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">😢</div>
+                    <div class="empty-title">Không thể tải giỏ hàng</div>
+                    <div class="empty-desc">${e.message}</div>
+                </div>
+            `;
+        }
+    }
+
+    function renderCart() {
+        const layout = document.getElementById('cartLayout');
+        document.getElementById('cartSubtitle').textContent = `${cartItems.length} sản phẩm`;
+
+        if (cartItems.length === 0) {
+            layout.innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">🛒</div>
+                    <div class="empty-title">Giỏ hàng trống</div>
+                    <div class="empty-desc">Hãy thêm sách vào giỏ hàng của bạn!</div>
+                    <a href="/store/" class="btn btn-primary">📚 Xem sách ngay</a>
+                </div>
+            `;
+            return;
+        }
+
+        let total = 0;
+        const itemsHtml = cartItems.map((item, i) => {
+            const book = booksMap[item.book_id] || {};
+            const price = parseFloat(book.price || 0);
+            const subtotal = price * (item.quantity || 1);
+            total += subtotal;
+
+            return `
+                <div class="cart-item">
+                    <div class="cart-item-cover ${gradClass(item.book_id || i)}">📖</div>
+                    <div class="cart-item-info">
+                        <div class="cart-item-title">${book.title || `Sách #${item.book_id}`}</div>
+                        <div class="cart-item-author">✍️ ${book.author || '—'}</div>
+                        <div class="cart-item-price">${formatPrice(subtotal)} ₫</div>
+                    </div>
+                    <div class="cart-item-qty">
+                        <button onclick="updateQty(${item.id}, ${item.quantity - 1})">−</button>
+                        <span>${item.quantity}</span>
+                        <button onclick="updateQty(${item.id}, ${item.quantity + 1})">+</button>
+                    </div>
+                    <button class="cart-item-remove" onclick="removeItem(${item.id})" title="Xóa">✕</button>
+                </div>
+            `;
+        }).join('');
+
+        layout.innerHTML = `
+            <div class="card">
+                ${itemsHtml}
+            </div>
+            <div class="cart-summary">
+                <div class="summary-title">📋 Tóm tắt đơn hàng</div>
+                <div class="summary-row">
+                    <span class="label">Số lượng sản phẩm</span>
+                    <span class="value">${cartItems.length}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Tạm tính</span>
+                    <span class="value">${formatPrice(total)} ₫</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Phí vận chuyển</span>
+                    <span class="value" style="color:var(--green)">Miễn phí</span>
+                </div>
+                <div class="summary-total">
+                    <span>Tổng cộng</span>
+                    <span class="total-price">${formatPrice(total)} ₫</span>
+                </div>
+                <div class="checkout-actions">
+                    <button class="btn btn-primary btn-block btn-lg" onclick="placeOrder()">📦 Đặt hàng</button>
+                    <a href="/store/" class="btn btn-outline btn-block">← Tiếp tục mua sắm</a>
+                </div>
+            </div>
+        `;
+    }
+
+    async function updateQty(itemId, newQty) {
+        if (newQty < 1) { removeItem(itemId); return; }
+        try {
+            await apiCall(`/api/proxy/cart-items/${itemId}/`, 'PATCH', { quantity: newQty });
+            loadCart();
+        } catch(e) {
+            showToast('Lỗi: ' + e.message, 'error');
+        }
+    }
+
+    async function removeItem(itemId) {
+        try {
+            await fetch(`/api/proxy/cart-items/${itemId}/`, { method: 'DELETE' });
+            showToast('Đã xóa sản phẩm');
+            loadCart();
+            loadCartCount();
+        } catch(e) {
+            showToast('Lỗi: ' + e.message, 'error');
+        }
+    }
+
+    async function clearCart() {
+        const c = getCustomer();
+        if (!c) return;
+        if (!confirm('Bạn có chắc muốn xóa toàn bộ giỏ hàng?')) return;
+        try {
+            await fetch(`/api/proxy/carts/${c.id}/`, { method: 'DELETE' });
+            showToast('Đã xóa giỏ hàng');
+            loadCart();
+            loadCartCount();
+        } catch(e) {
+            showToast('Lỗi: ' + e.message, 'error');
+        }
+    }
+
+    async function placeOrder() {
+        const c = getCustomer();
+        if (!c) return;
+        try {
+            await apiCall('/api/proxy/orders/', 'POST', { customer_id: c.id });
+            showToast('🎉 Đặt hàng thành công!');
+            setTimeout(() => window.location.href = '/store/orders/', 1500);
+        } catch(e) {
+            showToast('Lỗi: ' + e.message, 'error');
+        }
+    }
+
+    loadCart();
+</script>
+{% endblock %}

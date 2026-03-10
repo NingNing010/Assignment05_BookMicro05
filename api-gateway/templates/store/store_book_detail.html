@@ -1,0 +1,391 @@
+{% extends "store/store_base.html" %}
+{% block title %}{{ book_id }} — Chi tiết sách{% endblock %}
+{% block nav_books %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .book-detail {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 40px;
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 48px;
+        align-items: start;
+    }
+
+    .book-cover-large {
+        aspect-ratio: 3/4;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 5rem;
+        box-shadow: var(--shadow-lg);
+        position: sticky;
+        top: 80px;
+    }
+
+    .book-info { padding-top: 8px; }
+
+    .book-category-breadcrumb {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+    }
+
+    .book-category-breadcrumb a { color: var(--blue); }
+    .book-category-breadcrumb a:hover { text-decoration: underline; }
+
+    .book-title-large {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+        line-height: 1.25;
+    }
+
+    .book-author-large {
+        font-size: 1rem;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+    }
+
+    .book-price-large {
+        font-size: 2.2rem;
+        font-weight: 900;
+        color: var(--accent);
+        margin-bottom: 6px;
+    }
+
+    .book-price-large .currency { font-size: 1.2rem; font-weight: 500; }
+
+    .book-stock-info {
+        font-size: 0.88rem;
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .book-actions {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 32px;
+    }
+
+    .book-meta-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 28px;
+    }
+
+    .meta-item {
+        background: var(--bg-light);
+        padding: 16px;
+        border-radius: var(--radius-sm);
+    }
+
+    .meta-item .meta-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .meta-item .meta-value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .book-description {
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+    }
+
+    .book-description h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .book-description p {
+        font-size: 0.92rem;
+        line-height: 1.8;
+        color: var(--text-body);
+    }
+
+    /* Reviews section */
+    .reviews-section {
+        margin-top: 32px;
+        padding-top: 28px;
+        border-top: 1px solid var(--border);
+    }
+
+    .reviews-section h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .review-card {
+        background: var(--bg-light);
+        border-radius: var(--radius-sm);
+        padding: 16px 20px;
+        margin-bottom: 12px;
+    }
+
+    .review-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .review-stars { color: var(--gold); font-size: 0.9rem; }
+    .review-customer { font-size: 0.82rem; color: var(--text-muted); }
+    .review-comment { font-size: 0.88rem; color: var(--text-body); line-height: 1.6; }
+
+    .review-form-card {
+        background: var(--bg-white);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        margin-top: 20px;
+    }
+
+    .star-select {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 12px;
+    }
+
+    .star-select span {
+        font-size: 1.5rem;
+        cursor: pointer;
+        transition: transform 0.15s;
+        opacity: 0.3;
+    }
+
+    .star-select span.active { opacity: 1; }
+    .star-select span:hover { transform: scale(1.2); }
+
+    .qty-control {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        width: fit-content;
+    }
+
+    .qty-control button {
+        width: 42px;
+        height: 42px;
+        border: none;
+        background: var(--bg-light);
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-family: inherit;
+        color: var(--text-dark);
+    }
+
+    .qty-control button:hover { background: var(--border); }
+
+    .qty-control input {
+        width: 50px;
+        height: 42px;
+        border: none;
+        text-align: center;
+        font-size: 0.95rem;
+        font-weight: 600;
+        font-family: inherit;
+        outline: none;
+        color: var(--text-dark);
+    }
+
+    @media (max-width: 768px) {
+        .book-detail { grid-template-columns: 1fr; padding: 20px; }
+        .book-cover-large { position: static; max-width: 300px; margin: 0 auto; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="book-detail" id="bookDetail">
+    <div class="spinner" style="grid-column:1/-1"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const BOOK_ID = {{ book_id }};
+    let selectedRating = 5;
+
+    async function loadBook() {
+        try {
+            const [book, reviewsRes] = await Promise.all([
+                apiCall(`/api/proxy/books/${BOOK_ID}/`),
+                fetch(`/api/proxy/reviews/book/${BOOK_ID}/`).then(r => r.ok ? r.json() : [])
+            ]);
+
+            const reviews = Array.isArray(reviewsRes) ? reviewsRes : [];
+            const stockClass = book.stock > 5 ? 'in-stock' : book.stock > 0 ? 'low-stock' : 'out-of-stock';
+            const stockText = book.stock > 5 ? '✅ Còn hàng' : book.stock > 0 ? `⚠️ Chỉ còn ${book.stock} cuốn` : '❌ Hết hàng';
+            const stockColor = book.stock > 5 ? 'var(--green)' : book.stock > 0 ? 'var(--orange)' : 'var(--accent)';
+            const gradIdx = BOOK_ID % 6 + 1;
+
+            document.getElementById('bookDetail').innerHTML = `
+                <div class="book-cover-large grad-${gradIdx}">📖</div>
+                <div class="book-info">
+                    <div class="book-category-breadcrumb">
+                        <a href="/store/">Trang chủ</a> › <a href="/store/books/">Sách</a>
+                        ${book.category_name ? ` › <span>${book.category_name}</span>` : ''}
+                    </div>
+                    <h1 class="book-title-large">${book.title}</h1>
+                    <div class="book-author-large">✍️ ${book.author}</div>
+                    <div class="book-price-large">${formatPrice(book.price)} <span class="currency">₫</span></div>
+                    <div class="book-stock-info">
+                        <span class="tag ${stockClass === 'in-stock' ? 'tag-green' : stockClass === 'low-stock' ? 'tag-orange' : 'tag-red'}">${stockText}</span>
+                    </div>
+
+                    <div class="book-actions">
+                        <div class="qty-control">
+                            <button onclick="changeQty(-1)">−</button>
+                            <input type="number" id="qtyInput" value="1" min="1" max="${book.stock || 99}">
+                            <button onclick="changeQty(1)">+</button>
+                        </div>
+                        <button class="btn btn-primary btn-lg" onclick="addToCartDetail()" ${book.stock < 1 ? 'disabled style="opacity:0.5"' : ''}>
+                            🛒 Thêm vào giỏ hàng
+                        </button>
+                    </div>
+
+                    <div class="book-meta-grid">
+                        <div class="meta-item">
+                            <div class="meta-label">ISBN</div>
+                            <div class="meta-value">${book.isbn || '—'}</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Nhà xuất bản</div>
+                            <div class="meta-value">${book.publisher_name || '—'}</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Danh mục</div>
+                            <div class="meta-value">${book.category_name || '—'}</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Kho</div>
+                            <div class="meta-value">${book.stock} cuốn</div>
+                        </div>
+                    </div>
+
+                    ${book.description ? `
+                        <div class="book-description">
+                            <h3>📝 Mô tả</h3>
+                            <p>${book.description}</p>
+                        </div>
+                    ` : ''}
+
+                    <div class="reviews-section">
+                        <h3>⭐ Đánh giá (${reviews.length})</h3>
+                        ${reviews.length > 0 ? reviews.map(r => `
+                            <div class="review-card">
+                                <div class="review-header">
+                                    <span class="review-stars">${'⭐'.repeat(r.rating)}</span>
+                                    <span class="review-customer">Khách hàng #${r.customer_id}</span>
+                                </div>
+                                <div class="review-comment">${r.comment || ''}</div>
+                            </div>
+                        `).join('') : '<p style="color:var(--text-muted);font-size:0.88rem">Chưa có đánh giá nào</p>'}
+
+                        <div class="review-form-card" id="reviewForm" ${getCustomer() ? '' : 'style="display:none"'}>
+                            <h4 style="font-size:0.92rem;margin-bottom:12px">✍️ Viết đánh giá</h4>
+                            <div class="star-select" id="starSelect">
+                                <span onclick="setRating(1)">⭐</span>
+                                <span onclick="setRating(2)">⭐</span>
+                                <span onclick="setRating(3)">⭐</span>
+                                <span onclick="setRating(4)">⭐</span>
+                                <span onclick="setRating(5)">⭐</span>
+                            </div>
+                            <textarea class="form-control" id="reviewComment" rows="3" placeholder="Nhận xét của bạn..." style="margin-bottom:12px"></textarea>
+                            <button class="btn btn-navy btn-sm" onclick="submitReview()">Gửi đánh giá</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            setRating(5);
+        } catch(e) {
+            document.getElementById('bookDetail').innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">😢</div>
+                    <div class="empty-title">Không tìm thấy sách</div>
+                    <div class="empty-desc">${e.message}</div>
+                    <a href="/store/" class="btn btn-primary">← Về trang chủ</a>
+                </div>
+            `;
+        }
+    }
+
+    function changeQty(delta) {
+        const inp = document.getElementById('qtyInput');
+        const v = Math.max(1, parseInt(inp.value || 1) + delta);
+        inp.value = v;
+    }
+
+    function setRating(n) {
+        selectedRating = n;
+        document.querySelectorAll('#starSelect span').forEach((s, i) => {
+            s.classList.toggle('active', i < n);
+        });
+    }
+
+    async function addToCartDetail() {
+        const c = getCustomer();
+        if (!c) { window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname); return; }
+
+        const qty = parseInt(document.getElementById('qtyInput').value) || 1;
+        try {
+            await apiCall('/api/proxy/cart-items/', 'POST', {
+                cart: c.cart_id || c.id,
+                book_id: BOOK_ID,
+                quantity: qty
+            });
+            showToast(`Đã thêm ${qty} cuốn vào giỏ hàng! 🛒`);
+            loadCartCount();
+        } catch(e) {
+            showToast('Lỗi: ' + e.message, 'error');
+        }
+    }
+
+    async function submitReview() {
+        const c = getCustomer();
+        if (!c) return;
+        const comment = document.getElementById('reviewComment').value.trim();
+        try {
+            await apiCall('/api/proxy/reviews/', 'POST', {
+                book_id: BOOK_ID,
+                customer_id: c.id,
+                rating: selectedRating,
+                comment: comment
+            });
+            showToast('Đã gửi đánh giá! ⭐');
+            setTimeout(() => location.reload(), 1000);
+        } catch(e) {
+            showToast('Lỗi: ' + e.message, 'error');
+        }
+    }
+
+    loadBook();
+</script>
+{% endblock %}

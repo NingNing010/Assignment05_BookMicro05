@@ -97,6 +97,32 @@ def manager_list(request):
 
 
 # ──────────────────────────────────────────────
+# Customer-facing Store Views
+# ──────────────────────────────────────────────
+
+def store_home(request):
+    return render(request, "store/store_home.html")
+
+def store_books(request):
+    return render(request, "store/store_books.html")
+
+def store_book_detail(request, book_id):
+    return render(request, "store/store_book_detail.html", {"book_id": book_id})
+
+def store_cart(request):
+    return render(request, "store/store_cart.html")
+
+def store_orders(request):
+    return render(request, "store/store_orders.html")
+
+def store_login(request):
+    return render(request, "store/store_login.html")
+
+def store_register(request):
+    return render(request, "store/store_register.html")
+
+
+# ──────────────────────────────────────────────
 # Generic API Proxy — /api/proxy/<service>/<path>
 # Forwards requests to the correct microservice
 # ──────────────────────────────────────────────

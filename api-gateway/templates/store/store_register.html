@@ -1,0 +1,156 @@
+{% extends "store/store_base.html" %}
+{% block title %}Đăng ký{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-page {
+        min-height: calc(100vh - 64px - 80px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #f8f9fc 0%, #e8eaf6 100%);
+        padding: 40px 20px;
+    }
+
+    .auth-card {
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 48px 40px;
+        width: 100%;
+        max-width: 480px;
+    }
+
+    .auth-logo {
+        text-align: center;
+        margin-bottom: 32px;
+    }
+
+    .auth-logo .logo-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .auth-logo h2 { font-size: 1.5rem; font-weight: 800; color: var(--text-dark); }
+    .auth-logo p { font-size: 0.88rem; color: var(--text-muted); margin-top: 6px; }
+
+    .auth-error {
+        background: #fde8e8;
+        color: #c0392b;
+        padding: 12px 16px;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        margin-bottom: 16px;
+        display: none;
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 0.88rem;
+        color: var(--text-muted);
+    }
+
+    .auth-footer a {
+        color: var(--accent);
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover { text-decoration: underline; }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+
+    @media (max-width: 480px) {
+        .form-row { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="logo-icon">📝</div>
+            <h2>Đăng ký tài khoản</h2>
+            <p>Tham gia BookStore ngay hôm nay!</p>
+        </div>
+
+        <div class="auth-error" id="authError"></div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Tên đăng nhập *</label>
+                <input class="form-control" type="text" id="regName" placeholder="username">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Họ và tên *</label>
+                <input class="form-control" type="text" id="regFullName" placeholder="Nguyễn Văn A">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Email *</label>
+            <input class="form-control" type="email" id="regEmail" placeholder="email@example.com">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Số điện thoại</label>
+                <input class="form-control" type="tel" id="regPhone" placeholder="0901234567">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Địa chỉ</label>
+                <input class="form-control" type="text" id="regAddress" placeholder="TP. Hồ Chí Minh">
+            </div>
+        </div>
+
+        <button class="btn btn-navy btn-block btn-lg" onclick="doRegister()" id="regBtn" style="margin-top:8px">Đăng ký</button>
+
+        <div class="auth-footer">
+            Đã có tài khoản? <a href="/store/login/">Đăng nhập</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function doRegister() {
+        const name = document.getElementById('regName').value.trim();
+        const fullName = document.getElementById('regFullName').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const phone = document.getElementById('regPhone').value.trim();
+        const address = document.getElementById('regAddress').value.trim();
+        const errDiv = document.getElementById('authError');
+
+        if (!name || !fullName || !email) {
+            errDiv.textContent = 'Vui lòng điền đầy đủ các trường bắt buộc (*)';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        document.getElementById('regBtn').disabled = true;
+        document.getElementById('regBtn').textContent = 'Đang đăng ký...';
+
+        try {
+            const customer = await apiCall('/api/proxy/customers/', 'POST', {
+                name, full_name: fullName, email, phone, address
+            });
+
+            setCustomer(customer);
+            showAlert('Đăng ký thành công!', 'success');
+            setTimeout(() => window.location.href = '/store/', 800);
+        } catch(e) {
+            errDiv.textContent = 'Lỗi: ' + e.message;
+            errDiv.style.display = 'block';
+            document.getElementById('regBtn').disabled = false;
+            document.getElementById('regBtn').textContent = 'Đăng ký';
+        }
+    }
+
+    // If already logged in, redirect
+    if (getCustomer()) {
+        window.location.href = '/store/';
+    }
+</script>
+{% endblock %}

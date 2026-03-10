@@ -1,0 +1,404 @@
+{% extends "store/store_base.html" %}
+{% block title %}BookStore — Khám Phá Thế Giới Sách{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Hero Section ── */
+    .hero {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 30%, #0f3460 60%, #533483 100%);
+        padding: 80px 40px 60px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 40px;
+    }
+
+    .hero-text {
+        max-width: 560px;
+    }
+
+    .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(233,69,96,0.15);
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 6px 16px;
+        border-radius: 20px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(233,69,96,0.3);
+    }
+
+    .hero h1 {
+        font-size: 2.8rem;
+        font-weight: 900;
+        color: #fff;
+        line-height: 1.2;
+        margin-bottom: 8px;
+    }
+
+    .hero h1 .highlight { color: var(--gold); }
+
+    .hero-desc {
+        color: #aaa;
+        font-size: 1rem;
+        line-height: 1.7;
+        margin-bottom: 28px;
+    }
+
+    .hero-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 32px;
+        background: var(--gold);
+        color: var(--navy);
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+        text-decoration: none;
+    }
+
+    .hero-cta:hover { background: var(--gold-hover); transform: translateY(-2px); }
+
+    .hero-stats {
+        display: flex;
+        gap: 40px;
+        margin-top: 36px;
+    }
+
+    .hero-stat .stat-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .hero-stat .stat-label {
+        font-size: 0.78rem;
+        color: #888;
+        margin-top: 2px;
+    }
+
+    /* Floating books illustration */
+    .hero-visual {
+        position: relative;
+        width: 420px;
+        height: 300px;
+        flex-shrink: 0;
+    }
+
+    .floating-book {
+        position: absolute;
+        width: 60px;
+        height: 80px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        animation: float 4s ease-in-out infinite;
+    }
+
+    .floating-book:nth-child(1) { top: 20px; left: 40px; background: linear-gradient(135deg, #e94560, #c0392b); animation-delay: 0s; }
+    .floating-book:nth-child(2) { top: 10px; left: 130px; background: linear-gradient(135deg, #3498db, #2980b9); animation-delay: 0.5s; }
+    .floating-book:nth-child(3) { top: 40px; left: 220px; background: linear-gradient(135deg, #9b59b6, #8e44ad); animation-delay: 1s; }
+    .floating-book:nth-child(4) { top: 20px; left: 310px; background: linear-gradient(135deg, #f39c12, #e67e22); animation-delay: 0.7s; }
+    .floating-book:nth-child(5) { top: 0; right: 20px; background: linear-gradient(135deg, #2ecc71, #27ae60); animation-delay: 1.2s; }
+    .floating-book:nth-child(6) { top: 130px; left: 20px; background: linear-gradient(135deg, #1abc9c, #16a085); animation-delay: 0.3s; }
+    .floating-book:nth-child(7) { top: 120px; left: 110px; background: linear-gradient(135deg, #e74c3c, #c0392b); animation-delay: 0.8s; }
+    .floating-book:nth-child(8) { top: 140px; left: 200px; background: linear-gradient(135deg, #f5a623, #f39c12); animation-delay: 1.5s; }
+    .floating-book:nth-child(9) { top: 130px; left: 290px; background: linear-gradient(135deg, #667eea, #764ba2); animation-delay: 0.2s; }
+    .floating-book:nth-child(10) { top: 140px; right: 10px; background: linear-gradient(135deg, #e94560, #9b59b6); animation-delay: 1.8s; }
+    .floating-book:nth-child(11) { top: 230px; left: 60px; background: linear-gradient(135deg, #3498db, #9b59b6); animation-delay: 0.6s; }
+    .floating-book:nth-child(12) { top: 240px; left: 160px; background: linear-gradient(135deg, #2ecc71, #3498db); animation-delay: 1.1s; }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-12px) rotate(3deg); }
+    }
+
+    /* ── Search Bar ── */
+    .search-section {
+        max-width: 1280px;
+        margin: -28px auto 0;
+        padding: 0 40px;
+        position: relative;
+        z-index: 10;
+    }
+
+    .search-bar {
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .search-bar input {
+        flex: 1;
+        padding: 14px 20px;
+        border: none;
+        font-size: 0.95rem;
+        font-family: inherit;
+        outline: none;
+        color: var(--text-dark);
+        background: transparent;
+    }
+
+    .search-bar input::placeholder { color: var(--text-muted); }
+
+    .search-bar select {
+        padding: 12px 16px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-family: inherit;
+        color: var(--text-body);
+        background: var(--bg-light);
+        cursor: pointer;
+        outline: none;
+    }
+
+    .search-bar button {
+        padding: 14px 28px;
+        background: var(--navy);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .search-bar button:hover { background: var(--navy-light); }
+
+    /* ── Responsive hero ── */
+    @media (max-width: 900px) {
+        .hero-visual { display: none; }
+        .hero h1 { font-size: 2rem; }
+        .hero { padding: 50px 20px 40px; }
+        .search-section { padding: 0 16px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<section class="hero">
+    <div class="hero-inner">
+        <div class="hero-text">
+            <div class="hero-badge">⚡ Microservices Architecture</div>
+            <h1>
+                Khám Phá Thế Giới Sách<br>
+                <span class="highlight">Không Giới Hạn</span>
+            </h1>
+            <p class="hero-desc">
+                Hàng ngàn đầu sách hấp dẫn, giao hàng nhanh cả nước.<br>
+                Tìm cuốn sách bạn yêu thích ngay hôm nay!
+            </p>
+            <a href="#all-books" class="hero-cta">🔍 Xem sách ngay</a>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="stat-value" id="heroBookCount">...</div>
+                    <div class="stat-label">Tựa sách</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="stat-value">Fast</div>
+                    <div class="stat-label">Giao hàng</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="stat-value">24/7</div>
+                    <div class="stat-label">Hỗ trợ</div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="floating-book">📕</div>
+            <div class="floating-book">📗</div>
+            <div class="floating-book">📘</div>
+            <div class="floating-book">📙</div>
+            <div class="floating-book">📓</div>
+            <div class="floating-book">📕</div>
+            <div class="floating-book">📗</div>
+            <div class="floating-book">📘</div>
+            <div class="floating-book">📙</div>
+            <div class="floating-book">📓</div>
+            <div class="floating-book">📕</div>
+            <div class="floating-book">📗</div>
+        </div>
+    </div>
+</section>
+
+<!-- Search Bar -->
+<div class="search-section">
+    <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Tìm kiếm sách theo tên, tác giả..." onkeydown="if(event.key==='Enter')searchBooks()">
+        <select id="categoryFilter">
+            <option value="">Tất cả danh mục</option>
+        </select>
+        <button onclick="searchBooks()">🔍 Tìm kiếm</button>
+    </div>
+</div>
+
+<!-- All Books -->
+<section class="section" id="all-books">
+    <div class="section-header">
+        <div>
+            <div class="section-title">Tất Cả Sách</div>
+            <div class="section-subtitle" id="bookCountText">Đang tải...</div>
+        </div>
+        <div class="section-badge">🔥 Mới nhất</div>
+    </div>
+    <div class="books-grid" id="booksGrid">
+        <div class="spinner"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allBooks = [];
+    let categories = [];
+
+    async function loadData() {
+        try {
+            const [booksRes, catsRes] = await Promise.all([
+                fetch('/api/proxy/books/'),
+                fetch('/api/proxy/categories/')
+            ]);
+            allBooks = await booksRes.json();
+            categories = await catsRes.json();
+
+            // Update hero count
+            document.getElementById('heroBookCount').textContent = allBooks.length + '+';
+
+            // Populate category filter
+            const sel = document.getElementById('categoryFilter');
+            (Array.isArray(categories) ? categories : []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                sel.appendChild(opt);
+            });
+
+            renderBooks(allBooks);
+        } catch(e) {
+            document.getElementById('booksGrid').innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">😢</div>
+                    <div class="empty-title">Không thể tải dữ liệu</div>
+                    <div class="empty-desc">${e.message}</div>
+                </div>
+            `;
+        }
+    }
+
+    function renderBooks(books) {
+        const grid = document.getElementById('booksGrid');
+        document.getElementById('bookCountText').textContent = `${books.length} tựa sách hiện có`;
+
+        if (books.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-icon">📚</div>
+                    <div class="empty-title">Không tìm thấy sách</div>
+                    <div class="empty-desc">Thử tìm kiếm với từ khóa khác</div>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = books.map((b, i) => {
+            const stockClass = b.stock > 5 ? 'in-stock' : b.stock > 0 ? 'low-stock' : 'out-of-stock';
+            const stockText = b.stock > 5 ? 'Còn hàng' : b.stock > 0 ? `Còn ${b.stock}` : 'Hết hàng';
+
+            return `
+                <div class="book-card" onclick="window.location='/store/book/${b.id}/'">
+                    <div class="book-card-cover ${gradClass(i)}">
+                        <div class="book-icon">📖</div>
+                        ${b.category_name ? `<span class="category-tag">${b.category_name}</span>` : ''}
+                        <span class="stock-tag ${stockClass}">${stockText}</span>
+                    </div>
+                    <div class="book-card-body">
+                        <div class="book-card-title">${b.title}</div>
+                        <div class="book-card-author">✍️ ${b.author}</div>
+                        <div class="book-card-footer">
+                            <div class="book-card-price">${formatPrice(b.price)} <span class="currency">₫</span></div>
+                            <button class="btn-add-cart" onclick="event.stopPropagation();addToCart(${b.id})">🛒 Thêm</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function searchBooks() {
+        const q = document.getElementById('searchInput').value.trim().toLowerCase();
+        const cat = document.getElementById('categoryFilter').value;
+
+        let filtered = allBooks;
+        if (q) {
+            filtered = filtered.filter(b =>
+                b.title.toLowerCase().includes(q) ||
+                b.author.toLowerCase().includes(q) ||
+                (b.description || '').toLowerCase().includes(q)
+            );
+        }
+        if (cat) {
+            filtered = filtered.filter(b => String(b.category) === cat || String(b.category_name) === document.getElementById('categoryFilter').selectedOptions[0]?.text);
+        }
+        renderBooks(filtered);
+    }
+
+    async function addToCart(bookId) {
+        const c = getCustomer();
+        if (!c) {
+            window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
+            return;
+        }
+
+        try {
+            // Get customer's cart
+            const cartRes = await fetch(`/api/proxy/carts/${c.id}/`);
+            let cartData;
+            if (cartRes.ok) {
+                cartData = await cartRes.json();
+            }
+
+            // Add item
+            await apiCall('/api/proxy/cart-items/', 'POST', {
+                cart: c.cart_id || c.id,
+                book_id: bookId,
+                quantity: 1
+            });
+
+            showToast('Đã thêm vào giỏ hàng! 🛒');
+            loadCartCount();
+        } catch(e) {
+            showToast('Không thể thêm: ' + e.message, 'error');
+        }
+    }
+
+    loadData();
+</script>
+{% endblock %}

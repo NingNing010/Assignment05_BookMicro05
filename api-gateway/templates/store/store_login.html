@@ -1,0 +1,149 @@
+{% extends "store/store_base.html" %}
+{% block title %}Đăng nhập{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-page {
+        min-height: calc(100vh - 64px - 80px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #f8f9fc 0%, #e8eaf6 100%);
+        padding: 40px 20px;
+    }
+
+    .auth-card {
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 48px 40px;
+        width: 100%;
+        max-width: 440px;
+    }
+
+    .auth-logo {
+        text-align: center;
+        margin-bottom: 32px;
+    }
+
+    .auth-logo .logo-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .auth-logo h2 { font-size: 1.5rem; font-weight: 800; color: var(--text-dark); }
+    .auth-logo p { font-size: 0.88rem; color: var(--text-muted); margin-top: 6px; }
+
+    .auth-error {
+        background: #fde8e8;
+        color: #c0392b;
+        padding: 12px 16px;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        margin-bottom: 16px;
+        display: none;
+    }
+
+    .auth-footer {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 0.88rem;
+        color: var(--text-muted);
+    }
+
+    .auth-footer a {
+        color: var(--accent);
+        font-weight: 600;
+    }
+
+    .auth-footer a:hover { text-decoration: underline; }
+
+    .divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 24px 0;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+    }
+
+    .divider::before, .divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="logo-icon">📚</div>
+            <h2>Đăng nhập</h2>
+            <p>Chào mừng trở lại BookStore!</p>
+        </div>
+
+        <div class="auth-error" id="authError"></div>
+
+        <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-control" type="email" id="loginEmail" placeholder="email@example.com" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+
+        <button class="btn btn-navy btn-block btn-lg" onclick="doLogin()" id="loginBtn">Đăng nhập</button>
+
+        <div class="divider">hoặc</div>
+
+        <div class="auth-footer">
+            Chưa có tài khoản? <a href="/store/register/">Đăng ký ngay</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function doLogin() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const errDiv = document.getElementById('authError');
+
+        if (!email) {
+            errDiv.textContent = 'Vui lòng nhập email';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        document.getElementById('loginBtn').disabled = true;
+        document.getElementById('loginBtn').textContent = 'Đang đăng nhập...';
+
+        try {
+            const res = await fetch('/api/proxy/customers/');
+            const customers = await res.json();
+            const found = (Array.isArray(customers) ? customers : []).find(c => c.email === email);
+
+            if (found) {
+                setCustomer(found);
+                showAlert('Đăng nhập thành công!', 'success');
+
+                // Redirect
+                const params = new URLSearchParams(window.location.search);
+                const next = params.get('next') || '/store/';
+                setTimeout(() => window.location.href = next, 300);
+            } else {
+                errDiv.textContent = 'Không tìm thấy tài khoản với email này';
+                errDiv.style.display = 'block';
+                document.getElementById('loginBtn').disabled = false;
+                document.getElementById('loginBtn').textContent = 'Đăng nhập';
+            }
+        } catch(e) {
+            errDiv.textContent = 'Lỗi kết nối: ' + e.message;
+            errDiv.style.display = 'block';
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('loginBtn').textContent = 'Đăng nhập';
+        }
+    }
+
+    // If already logged in, redirect
+    if (getCustomer()) {
+        window.location.href = '/store/';
+    }
+</script>
+{% endblock %}

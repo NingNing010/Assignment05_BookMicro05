@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Payments{% endblock %}
+{% block nav_payments %}active{% endblock %}
+{% block page_title %}💳 Payments{% endblock %}
+{% block content %}
+<div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>ID</th><th>Order</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+    <tbody id="tableBody"><tr><td colspan="5" style="text-align:center;color:#666;">Loading...</td></tr></tbody>
+</table></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadData(){try{const r=await fetch('/api/proxy/payments/');const items=await r.json();const t=document.getElementById('tableBody');if(!items.length){t.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="icon">💳</div><p>No payments.</p></div></td></tr>';return;}t.innerHTML=items.map(p=>`<tr><td>#${p.id}</td><td>Order #${p.order_id}</td><td><span class="tag tag-green">$${p.amount}</span></td><td><span class="tag tag-blue">${p.method}</span></td><td><span class="tag ${p.status==='completed'?'tag-green':p.status==='failed'?'tag-red':'tag-orange'}">${p.status}</span></td></tr>`).join('');}catch(e){document.getElementById('tableBody').innerHTML='<tr><td colspan="5" style="color:#e94560;">Failed</td></tr>';}}
+loadData();
+</script>
+{% endblock %}

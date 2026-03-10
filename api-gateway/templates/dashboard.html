@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block page_title %}📊 Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid">
+    <a href="/books/" class="stat-card">
+        <div class="stat-icon red">📖</div>
+        <div class="stat-info">
+            <h3 id="bookCount">—</h3>
+            <p>Total Books</p>
+        </div>
+    </a>
+    <a href="/customers/" class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div class="stat-info">
+            <h3 id="customerCount">—</h3>
+            <p>Customers</p>
+        </div>
+    </a>
+    <a href="/orders/" class="stat-card">
+        <div class="stat-icon green">📦</div>
+        <div class="stat-info">
+            <h3 id="orderCount">—</h3>
+            <p>Orders</p>
+        </div>
+    </a>
+    <a href="/categories/" class="stat-card">
+        <div class="stat-icon orange">🏷️</div>
+        <div class="stat-info">
+            <h3 id="categoryCount">—</h3>
+            <p>Categories</p>
+        </div>
+    </a>
+    <a href="/publishers/" class="stat-card">
+        <div class="stat-icon purple">🏢</div>
+        <div class="stat-info">
+            <h3 id="publisherCount">—</h3>
+            <p>Publishers</p>
+        </div>
+    </a>
+    <a href="/reviews/" class="stat-card">
+        <div class="stat-icon orange">⭐</div>
+        <div class="stat-info">
+            <h3 id="reviewCount">—</h3>
+            <p>Reviews</p>
+        </div>
+    </a>
+</div>
+
+<!-- Recent books -->
+<div class="card">
+    <div class="card-title">📖 Recent Books</div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Category</th>
+                    <th>Publisher</th>
+                </tr>
+            </thead>
+            <tbody id="recentBooks">
+                <tr><td colspan="6" style="text-align:center;color:#666;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent customers -->
+<div class="card">
+    <div class="card-title">👥 Recent Customers</div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                </tr>
+            </thead>
+            <tbody id="recentCustomers">
+                <tr><td colspan="4" style="text-align:center;color:#666;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Quick actions -->
+<div class="card">
+    <div class="card-title">⚡ Quick Actions</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <a href="/agent/" class="btn btn-primary">🤖 AI Agent Chat</a>
+        <a href="/books/" class="btn btn-blue">📖 Manage Books</a>
+        <a href="/customers/" class="btn btn-success">👥 Manage Customers</a>
+        <a href="/orders/" class="btn btn-outline">📦 View Orders</a>
+        <a href="/publishers/" class="btn btn-outline">🏢 Publishers</a>
+        <a href="/categories/" class="btn btn-outline">🏷️ Categories</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDashboard() {
+    // Load stats
+    const endpoints = [
+        { url: '/api/proxy/books/', el: 'bookCount' },
+        { url: '/api/proxy/customers/', el: 'customerCount' },
+        { url: '/api/proxy/orders/', el: 'orderCount' },
+        { url: '/api/proxy/categories/', el: 'categoryCount' },
+        { url: '/api/proxy/publishers/', el: 'publisherCount' },
+        { url: '/api/proxy/reviews/', el: 'reviewCount' },
+    ];
+
+    for (const ep of endpoints) {
+        try {
+            const res = await fetch(ep.url);
+            const data = await res.json();
+            document.getElementById(ep.el).textContent = Array.isArray(data) ? data.length : '0';
+        } catch (e) {
+            document.getElementById(ep.el).textContent = '—';
+        }
+    }
+
+    // Load recent books
+    try {
+        const res = await fetch('/api/proxy/books/');
+        const books = await res.json();
+        const tbody = document.getElementById('recentBooks');
+        if (books.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📖</div><p>No books yet. Add your first book!</p></div></td></tr>';
+        } else {
+            tbody.innerHTML = books.slice(0, 5).map(b => `
+                <tr>
+                    <td>${b.title}</td>
+                    <td>${b.author}</td>
+                    <td><span class="tag tag-green">$${b.price}</span></td>
+                    <td>${b.stock}</td>
+                    <td>${b.category_name || '—'}</td>
+                    <td>${b.publisher_name || '—'}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) { document.getElementById('recentBooks').innerHTML = '<tr><td colspan="6" style="color:#e94560;">Failed to load</td></tr>'; }
+
+    // Load recent customers
+    try {
+        const res = await fetch('/api/proxy/customers/');
+        const customers = await res.json();
+        const tbody = document.getElementById('recentCustomers');
+        if (customers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="icon">👥</div><p>No customers yet.</p></div></td></tr>';
+        } else {
+            tbody.innerHTML = customers.slice(0, 5).map(c => `
+                <tr>
+                    <td>${c.full_name || c.name}</td>
+                    <td>${c.email}</td>
+                    <td>${c.phone || '—'}</td>
+                    <td>${c.address || '—'}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) { document.getElementById('recentCustomers').innerHTML = '<tr><td colspan="4" style="color:#e94560;">Failed to load</td></tr>'; }
+}
+
+loadDashboard();
+</script>
+{% endblock %}

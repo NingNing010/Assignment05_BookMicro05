@@ -1,0 +1,91 @@
+services:
+  book-service:
+    build: ./book-service
+    ports:
+      - "8002:8000"
+
+  cart-service:
+    build: ./cart-service
+    ports:
+      - "8003:8000"
+    depends_on:
+      - book-service
+
+  customer-service:
+    build: ./customer-service
+    ports:
+      - "8001:8000"
+    depends_on:
+      - cart-service
+
+  staff-service:
+    build: ./staff-service
+    ports:
+      - "8004:8000"
+    depends_on:
+      - book-service
+
+  manager-service:
+    build: ./manager-service
+    ports:
+      - "8005:8000"
+    depends_on:
+      - staff-service
+
+  catalog-service:
+    build: ./catalog-service
+    ports:
+      - "8006:8000"
+    depends_on:
+      - book-service
+
+  pay-service:
+    build: ./pay-service
+    ports:
+      - "8009:8000"
+
+  ship-service:
+    build: ./ship-service
+    ports:
+      - "8008:8000"
+
+  order-service:
+    build: ./order-service
+    ports:
+      - "8007:8000"
+    depends_on:
+      - pay-service
+      - ship-service
+      - cart-service
+
+  comment-rate-service:
+    build: ./comment-rate-service
+    ports:
+      - "8010:8000"
+    depends_on:
+      - book-service
+
+  recommender-ai-service:
+    build: ./recommender-ai-service
+    ports:
+      - "8011:8000"
+    depends_on:
+      - book-service
+      - comment-rate-service
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - customer-service
+      - book-service
+      - cart-service
+      - staff-service
+      - manager-service
+      - catalog-service
+      - order-service
+      - ship-service
+      - pay-service
+      - comment-rate-service
+      - recommender-ai-service

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Books{% endblock %}
+{% block nav_books %}active{% endblock %}
+{% block page_title %}📖 Books{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal()">➕ Add Book</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>ISBN</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Category</th>
+                    <th>Publisher</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="9" style="text-align:center;color:#666;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <h3 id="modalTitle">➕ Add New Book</h3>
+        <input type="hidden" id="editId">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Title *</label>
+                <input class="form-control" id="fTitle" placeholder="Book title">
+            </div>
+            <div class="form-group">
+                <label>Author *</label>
+                <input class="form-control" id="fAuthor" placeholder="Author name">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Price *</label>
+                <input class="form-control" id="fPrice" type="number" step="0.01" placeholder="29.99">
+            </div>
+            <div class="form-group">
+                <label>Stock *</label>
+                <input class="form-control" id="fStock" type="number" placeholder="100">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>ISBN</label>
+                <input class="form-control" id="fIsbn" placeholder="978-...">
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select class="form-control" id="fCategory">
+                    <option value="">— None —</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Publisher</label>
+                <select class="form-control" id="fPublisher">
+                    <option value="">— None —</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea class="form-control" id="fDescription" rows="3" placeholder="Book description..."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveBook()">💾 Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API = '/api/proxy/books';
+
+async function loadData() {
+    try {
+        const [catRes, pubRes] = await Promise.all([
+            fetch('/api/proxy/categories/'),
+            fetch('/api/proxy/publishers/')
+        ]);
+        const cats = await catRes.json();
+        const pubs = await pubRes.json();
+        const catSel = document.getElementById('fCategory');
+        const pubSel = document.getElementById('fPublisher');
+        catSel.innerHTML = '<option value="">— None —</option>';
+        pubSel.innerHTML = '<option value="">— None —</option>';
+        cats.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; catSel.appendChild(o); });
+        pubs.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; pubSel.appendChild(o); });
+    } catch(e) {}
+
+    try {
+        const res = await fetch(API + '/');
+        const items = await res.json();
+        const tbody = document.getElementById('tableBody');
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">📖</div><p>No books yet. Click "Add Book" to get started!</p></div></td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(b => `
+            <tr>
+                <td>#${b.id}</td>
+                <td><strong>${b.title}</strong></td>
+                <td>${b.author}</td>
+                <td><span style="color:#888;">${b.isbn || '—'}</span></td>
+                <td><span class="tag tag-green">$${b.price}</span></td>
+                <td>${b.stock}</td>
+                <td>${b.category_name ? '<span class="tag tag-blue">'+b.category_name+'</span>' : '—'}</td>
+                <td>${b.publisher_name ? '<span class="tag tag-purple">'+b.publisher_name+'</span>' : '—'}</td>
+                <td>
+                    <button class="btn btn-sm btn-blue" onclick='editBook(${JSON.stringify(b)})'>✏️</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteBook(${b.id})">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" style="color:#e94560;">Failed to load books</td></tr>';
+    }
+}
+
+function openModal() {
+    document.getElementById('editId').value = '';
+    document.getElementById('modalTitle').textContent = '➕ Add New Book';
+    ['fTitle','fAuthor','fPrice','fStock','fIsbn','fDescription'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fCategory').value = '';
+    document.getElementById('fPublisher').value = '';
+    document.getElementById('modal').classList.add('show');
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+function editBook(b) {
+    document.getElementById('editId').value = b.id;
+    document.getElementById('modalTitle').textContent = '✏️ Edit Book #' + b.id;
+    document.getElementById('fTitle').value = b.title;
+    document.getElementById('fAuthor').value = b.author;
+    document.getElementById('fPrice').value = b.price;
+    document.getElementById('fStock').value = b.stock;
+    document.getElementById('fIsbn').value = b.isbn || '';
+    document.getElementById('fDescription').value = b.description || '';
+    document.getElementById('fCategory').value = b.category || '';
+    document.getElementById('fPublisher').value = b.publisher || '';
+    document.getElementById('modal').classList.add('show');
+}
+
+async function saveBook() {
+    const id = document.getElementById('editId').value;
+    const body = {
+        title: document.getElementById('fTitle').value,
+        author: document.getElementById('fAuthor').value,
+        price: document.getElementById('fPrice').value,
+        stock: parseInt(document.getElementById('fStock').value) || 0,
+        isbn: document.getElementById('fIsbn').value,
+        description: document.getElementById('fDescription').value,
+        category: document.getElementById('fCategory').value || null,
+        publisher: document.getElementById('fPublisher').value || null,
+    };
+    const url = id ? `${API}/${id}/` : API + '/';
+    const method = id ? 'PUT' : 'POST';
+    const r = await apiCall(url, method, body);
+    if (r.ok) { showToast(id ? 'Book updated!' : 'Book created!'); closeModal(); loadData(); }
+    else { showToast('Error: ' + JSON.stringify(r.data), 'error'); }
+}
+
+async function deleteBook(id) {
+    if (!confirm('Delete book #' + id + '?')) return;
+    await apiCall(`${API}/${id}/`, 'DELETE');
+    showToast('Book deleted!');
+    loadData();
+}
+
+loadData();
+</script>
+{% endblock %}

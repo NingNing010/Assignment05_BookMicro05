@@ -378,16 +378,8 @@
         }
 
         try {
-            // Get customer's cart
-            const cartRes = await fetch(`/api/proxy/carts/${c.id}/`);
-            let cartData;
-            if (cartRes.ok) {
-                cartData = await cartRes.json();
-            }
-
-            // Add item
             await apiCall('/api/proxy/cart-items/', 'POST', {
-                cart: c.cart_id || c.id,
+                customer_id: c.id,
                 book_id: bookId,
                 quantity: 1
             });

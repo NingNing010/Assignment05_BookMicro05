@@ -20,14 +20,31 @@ class CartCreate(APIView):
 class AddCartItem(APIView):
     def post(self, request):
         book_id = request.data.get("book_id")
+        customer_id = request.data.get("customer_id")
+        quantity = request.data.get("quantity", 1)
+
+        if not customer_id:
+            return Response({"error": "customer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Auto-create cart for customer if it doesn't exist
+        cart, _ = Cart.objects.get_or_create(customer_id=customer_id)
+
+        # Check if book already in cart – if so, increment quantity
+        existing = CartItem.objects.filter(cart=cart, book_id=book_id).first()
+        if existing:
+            existing.quantity += int(quantity)
+            existing.save()
+            return Response(CartItemSerializer(existing).data, status=status.HTTP_200_OK)
+
+        # Validate book exists (optional, non-blocking)
         try:
-            r = requests.get(f"{BOOK_SERVICE_URL}/books/")
-            books = r.json()
-            if not any(b["id"] == book_id for b in books):
+            r = requests.get(f"{BOOK_SERVICE_URL}/books/{book_id}/", timeout=5)
+            if r.status_code == 404:
                 return Response({"error": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception:
             pass  # Allow adding even if book-service is down
-        serializer = CartItemSerializer(data=request.data)
+
+        serializer = CartItemSerializer(data={"cart": cart.id, "book_id": book_id, "quantity": quantity})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)

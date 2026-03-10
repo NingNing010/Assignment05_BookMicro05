@@ -357,7 +357,7 @@
         const qty = parseInt(document.getElementById('qtyInput').value) || 1;
         try {
             await apiCall('/api/proxy/cart-items/', 'POST', {
-                cart: c.cart_id || c.id,
+                customer_id: c.id,
                 book_id: BOOK_ID,
                 quantity: qty
             });

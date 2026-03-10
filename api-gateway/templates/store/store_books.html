@@ -157,7 +157,7 @@
         const c = getCustomer();
         if (!c) { window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname); return; }
         try {
-            await apiCall('/api/proxy/cart-items/', 'POST', { cart: c.cart_id || c.id, book_id: bookId, quantity: 1 });
+            await apiCall('/api/proxy/cart-items/', 'POST', { customer_id: c.id, book_id: bookId, quantity: 1 });
             showToast('Đã thêm vào giỏ hàng! 🛒');
             loadCartCount();
         } catch(e) { showToast('Lỗi: ' + e.message, 'error'); }

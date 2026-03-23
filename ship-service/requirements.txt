@@ -1,2 +1,6 @@
-django
+﻿django
 djangorestframework
+PyMySQL
+
+
+cryptography

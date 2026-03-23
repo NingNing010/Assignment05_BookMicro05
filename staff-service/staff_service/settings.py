@@ -1,6 +1,10 @@
-from pathlib import Path
+﻿from pathlib import Path
+import os
+import pymysql
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+pymysql.install_as_MySQLdb()
 
 SECRET_KEY = 'django-insecure-staff-service-secret-key'
 DEBUG = True
@@ -49,8 +53,13 @@ WSGI_APPLICATION = 'staff_service.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME', 'bookstore_staff'),
+        'USER': os.getenv('DB_USER', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'mattroi010'),
+        'HOST': os.getenv('DB_HOST', 'host.docker.internal'),
+        'PORT': os.getenv('DB_PORT', '3306'),
+        'OPTIONS': {'charset': 'utf8mb4'},
     }
 }
 
@@ -60,3 +69,5 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+

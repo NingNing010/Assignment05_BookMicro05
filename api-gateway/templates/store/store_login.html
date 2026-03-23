@@ -88,6 +88,11 @@
             <input class="form-control" type="email" id="loginEmail" placeholder="email@example.com" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
 
+        <div class="form-group">
+            <label class="form-label">Mật khẩu</label>
+            <input class="form-control" type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+
         <button class="btn btn-navy btn-block btn-lg" onclick="doLogin()" id="loginBtn">Đăng nhập</button>
 
         <div class="divider">hoặc</div>
@@ -103,10 +108,11 @@
 <script>
     async function doLogin() {
         const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
         const errDiv = document.getElementById('authError');
 
-        if (!email) {
-            errDiv.textContent = 'Vui lòng nhập email';
+        if (!email || !password) {
+            errDiv.textContent = 'Vui lòng nhập email và mật khẩu';
             errDiv.style.display = 'block';
             return;
         }
@@ -115,24 +121,62 @@
         document.getElementById('loginBtn').textContent = 'Đang đăng nhập...';
 
         try {
-            const res = await fetch('/api/proxy/customers/');
-            const customers = await res.json();
-            const found = (Array.isArray(customers) ? customers : []).find(c => c.email === email);
+            let authRes = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email, password })
+            });
 
-            if (found) {
-                setCustomer(found);
-                showAlert('Đăng nhập thành công!', 'success');
-
-                // Redirect
-                const params = new URLSearchParams(window.location.search);
-                const next = params.get('next') || '/store/';
-                setTimeout(() => window.location.href = next, 300);
-            } else {
-                errDiv.textContent = 'Không tìm thấy tài khoản với email này';
-                errDiv.style.display = 'block';
-                document.getElementById('loginBtn').disabled = false;
-                document.getElementById('loginBtn').textContent = 'Đăng nhập';
+            // Backward compatibility: if customer existed before auth-service,
+            // auto-provision auth account and retry login once.
+            if (!authRes.ok) {
+                const customersRes = await fetch('/api/proxy/customers/');
+                const customers = await customersRes.json();
+                const foundCustomer = (Array.isArray(customers) ? customers : []).find(c => c.email === email);
+                if (foundCustomer) {
+                    await fetch('/api/auth/register/', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            email,
+                            password,
+                            full_name: foundCustomer.full_name || foundCustomer.name || email,
+                            role: 'customer'
+                        })
+                    });
+                    authRes = await fetch('/api/auth/login/', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ email, password })
+                    });
+                }
             }
+
+            const authData = await authRes.json();
+            if (!authRes.ok || !authData.access_token) {
+                throw new Error(authData.error || 'Đăng nhập thất bại');
+            }
+
+            setAuthSession({
+                access_token: authData.access_token,
+                refresh_token: authData.refresh_token,
+                user: authData.user || null
+            });
+
+            // Sync customer profile for storefront pages.
+            const customersRes = await fetch('/api/proxy/customers/');
+            const customers = await customersRes.json();
+            const found = (Array.isArray(customers) ? customers : []).find(c => c.email === email);
+            if (!found) {
+                throw new Error('Không tìm thấy hồ sơ khách hàng tương ứng');
+            }
+            setCustomer(found);
+
+            showAlert('Đăng nhập thành công!', 'success');
+
+            const params = new URLSearchParams(window.location.search);
+            const next = params.get('next') || '/store/';
+            setTimeout(() => window.location.href = next, 300);
         } catch(e) {
             errDiv.textContent = 'Lỗi kết nối: ' + e.message;
             errDiv.style.display = 'block';
@@ -142,7 +186,7 @@
     }
 
     // If already logged in, redirect
-    if (getCustomer()) {
+    if (getCustomer() && getAccessToken()) {
         window.location.href = '/store/';
     }
 </script>

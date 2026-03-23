@@ -1,2 +1,7 @@
-django
+﻿django
 requests
+PyJWT
+PyMySQL
+
+
+cryptography

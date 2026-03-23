@@ -95,6 +95,17 @@
 
         <div class="form-row">
             <div class="form-group">
+                <label class="form-label">Mật khẩu *</label>
+                <input class="form-control" type="password" id="regPassword" placeholder="Tối thiểu 6 ký tự">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nhập lại mật khẩu *</label>
+                <input class="form-control" type="password" id="regPassword2" placeholder="Nhập lại mật khẩu">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
                 <label class="form-label">Số điện thoại</label>
                 <input class="form-control" type="tel" id="regPhone" placeholder="0901234567">
             </div>
@@ -119,12 +130,26 @@
         const name = document.getElementById('regName').value.trim();
         const fullName = document.getElementById('regFullName').value.trim();
         const email = document.getElementById('regEmail').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const password2 = document.getElementById('regPassword2').value;
         const phone = document.getElementById('regPhone').value.trim();
         const address = document.getElementById('regAddress').value.trim();
         const errDiv = document.getElementById('authError');
 
-        if (!name || !fullName || !email) {
+        if (!name || !fullName || !email || !password || !password2) {
             errDiv.textContent = 'Vui lòng điền đầy đủ các trường bắt buộc (*)';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        if (password.length < 6) {
+            errDiv.textContent = 'Mật khẩu phải có ít nhất 6 ký tự';
+            errDiv.style.display = 'block';
+            return;
+        }
+
+        if (password !== password2) {
+            errDiv.textContent = 'Mật khẩu nhập lại không khớp';
             errDiv.style.display = 'block';
             return;
         }
@@ -133,8 +158,39 @@
         document.getElementById('regBtn').textContent = 'Đang đăng ký...';
 
         try {
+            const authRes = await fetch('/api/auth/register/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    email,
+                    password,
+                    full_name: fullName,
+                    role: 'customer'
+                })
+            });
+            const authData = await authRes.json();
+            if (!authRes.ok) {
+                throw new Error(authData.error || JSON.stringify(authData));
+            }
+
             const customer = await apiCall('/api/proxy/customers/', 'POST', {
                 name, full_name: fullName, email, phone, address
+            });
+
+            const loginRes = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email, password })
+            });
+            const loginData = await loginRes.json();
+            if (!loginRes.ok || !loginData.access_token) {
+                throw new Error(loginData.error || 'Không thể đăng nhập sau khi đăng ký');
+            }
+
+            setAuthSession({
+                access_token: loginData.access_token,
+                refresh_token: loginData.refresh_token,
+                user: loginData.user || authData || null
             });
 
             setCustomer(customer);
@@ -149,7 +205,7 @@
     }
 
     // If already logged in, redirect
-    if (getCustomer()) {
+    if (getCustomer() && getAccessToken()) {
         window.location.href = '/store/';
     }
 </script>

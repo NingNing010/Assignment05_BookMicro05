@@ -633,6 +633,176 @@
         @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(100%); } }
 
+        /* Floating AI chatbot */
+        .chatbot-fab {
+            position: fixed;
+            right: 20px;
+            bottom: 24px;
+            width: 58px;
+            height: 58px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e94560, #f39c12);
+            color: #fff;
+            font-size: 1.35rem;
+            cursor: pointer;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+            z-index: 10001;
+            transition: transform 0.2s ease;
+        }
+
+        .chatbot-fab:hover { transform: translateY(-2px) scale(1.03); }
+
+        .chatbot-panel {
+            position: fixed;
+            right: 20px;
+            bottom: 92px;
+            width: 360px;
+            max-width: calc(100vw - 20px);
+            height: 520px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 10001;
+        }
+
+        .chatbot-panel.open { display: flex; }
+
+        .chatbot-header {
+            background: var(--navy);
+            color: #fff;
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chatbot-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chatbot-close {
+            border: none;
+            background: transparent;
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            padding: 12px;
+            background: #f7f8fc;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-msg {
+            max-width: 88%;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 0.84rem;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .chat-msg.user {
+            align-self: flex-end;
+            background: #1f2651;
+            color: #fff;
+        }
+
+        .chat-msg.agent {
+            align-self: flex-start;
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #e6e8ef;
+        }
+
+        .chat-rich-list {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .chat-rich-item {
+            border: 1px solid #e7eaf3;
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: #fbfcff;
+            font-size: 0.8rem;
+        }
+
+        .chat-rich-item .title {
+            font-weight: 700;
+            color: #1f2651;
+        }
+
+        .chat-rich-item .meta {
+            color: #5f6780;
+            margin-top: 2px;
+            font-size: 0.75rem;
+        }
+
+        .chatbot-quick {
+            padding: 8px 12px;
+            border-top: 1px solid var(--border);
+            background: #fff;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+        }
+
+        .chatbot-quick button {
+            border: 1px solid #d9deea;
+            background: #fff;
+            color: #1f2651;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .chatbot-input {
+            padding: 10px;
+            border-top: 1px solid var(--border);
+            background: #fff;
+            display: flex;
+            gap: 8px;
+        }
+
+        .chatbot-input input {
+            flex: 1;
+            border: 1px solid #d9deea;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 0.84rem;
+            outline: none;
+        }
+
+        .chatbot-input button {
+            border: none;
+            border-radius: 10px;
+            background: var(--gold);
+            color: #1a1a2e;
+            font-weight: 700;
+            padding: 0 14px;
+            cursor: pointer;
+        }
+
         {% block extra_css %}{% endblock %}
     </style>
 </head>
@@ -664,6 +834,28 @@
     <!-- Toast container -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- Floating AI Chatbot -->
+    <button class="chatbot-fab" id="chatbotFab" onclick="toggleChatbot()" title="AI Chatbot">🤖</button>
+    <div class="chatbot-panel" id="chatbotPanel">
+        <div class="chatbot-header">
+            <div class="chatbot-title">🤖 BookStore AI</div>
+            <button class="chatbot-close" onclick="toggleChatbot(false)">✕</button>
+        </div>
+        <div class="chatbot-messages" id="chatbotMessages">
+            <div class="chat-msg agent">Xin chào! Mình là AI trợ lý BookStore.\nBạn có thể hỏi: "tìm sách python", "xem giỏ hàng", "đặt hàng"...</div>
+        </div>
+        <div class="chatbot-quick">
+            <button onclick="sendQuickChat('help')">help</button>
+            <button onclick="sendQuickChat('xem giỏ hàng')">xem giỏ</button>
+            <button onclick="sendQuickChat('xem đơn hàng')">xem đơn</button>
+            <button onclick="sendQuickChat('gợi ý sách')">gợi ý</button>
+        </div>
+        <div class="chatbot-input">
+            <input id="chatbotInput" placeholder="Nhập tin nhắn..." onkeydown="if(event.key==='Enter')sendChatbotMessage()">
+            <button onclick="sendChatbotMessage()">Gửi</button>
+        </div>
+    </div>
+
     <!-- Page Content -->
     <div class="page-content">
         {% block content %}{% endblock %}
@@ -686,10 +878,31 @@
     </footer>
 
     <script>
+        let chatbotConversationId = null;
+
         // ── Customer session management ──
         function getCustomer() {
             const data = localStorage.getItem('store_customer');
             return data ? JSON.parse(data) : null;
+        }
+
+        function getAuthSession() {
+            const data = localStorage.getItem('store_auth');
+            return data ? JSON.parse(data) : null;
+        }
+
+        function getAccessToken() {
+            const s = getAuthSession();
+            return s && s.access_token ? s.access_token : null;
+        }
+
+        function getRefreshToken() {
+            const s = getAuthSession();
+            return s && s.refresh_token ? s.refresh_token : null;
+        }
+
+        function setAuthSession(session) {
+            localStorage.setItem('store_auth', JSON.stringify(session));
         }
 
         function setCustomer(customer) {
@@ -699,15 +912,23 @@
 
         function logout() {
             localStorage.removeItem('store_customer');
+            localStorage.removeItem('store_auth');
             window.location.href = '/store/';
         }
 
         function renderNav() {
-            const c = getCustomer();
+            let c = getCustomer();
+            const token = getAccessToken();
             const nav = document.getElementById('navRight');
             const footer = document.getElementById('footerUser');
 
-            if (c) {
+            // Normalize stale session: customer profile exists but no JWT token.
+            if (c && !token) {
+                localStorage.removeItem('store_customer');
+                c = null;
+            }
+
+            if (c && token) {
                 nav.innerHTML = `
                     <a href="/store/orders/" class="nav-link {% block nav_orders %}{% endblock %}"><span class="icon">📦</span> Đơn hàng</a>
                     <a href="/store/cart/" class="nav-cart-btn {% block nav_cart %}{% endblock %}">🛒 Giỏ hàng <span class="cart-badge" id="cartCount" style="display:none">0</span></a>
@@ -718,8 +939,8 @@
                 loadCartCount();
             } else {
                 nav.innerHTML = `
-                    <a href="/store/login/" class="nav-auth-btn btn-login">Đăng nhập</a>
-                    <a href="/store/register/" class="nav-auth-btn btn-register">Đăng ký</a>
+                    <a href="/store/login/" class="nav-auth-btn btn-login" onclick="window.location.href='/store/login/'; return false;">Đăng nhập</a>
+                    <a href="/store/register/" class="nav-auth-btn btn-register" onclick="window.location.href='/store/register/'; return false;">Đăng ký</a>
                 `;
                 if (footer) footer.innerHTML = '';
             }
@@ -764,13 +985,186 @@
         }
 
         // ── API helper ──
-        async function apiCall(url, method = 'GET', body = null) {
+        async function _refreshAccessToken() {
+            const refreshToken = getRefreshToken();
+            if (!refreshToken) return null;
+
+            const res = await fetch('/api/auth/refresh/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
+
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (e) {}
+
+            if (!res.ok || !data.access_token) {
+                return null;
+            }
+
+            const session = getAuthSession() || {};
+            session.access_token = data.access_token;
+            setAuthSession(session);
+            return data.access_token;
+        }
+
+        async function apiCall(url, method = 'GET', body = null, allowRetry = true) {
             const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            const token = getAccessToken();
+            if (token) {
+                opts.headers['Authorization'] = `Bearer ${token}`;
+            }
             if (body) opts.body = JSON.stringify(body);
-            const res = await fetch(url, opts);
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || data.detail || JSON.stringify(data));
+
+            let res = await fetch(url, opts);
+
+            if (res.status === 401 && allowRetry && getRefreshToken()) {
+                const newAccessToken = await _refreshAccessToken();
+                if (newAccessToken) {
+                    opts.headers['Authorization'] = `Bearer ${newAccessToken}`;
+                    res = await fetch(url, opts);
+                } else {
+                    // Session is no longer valid in auth-service.
+                    logout();
+                    throw new Error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại');
+                }
+            }
+
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (e) {
+                data = {};
+            }
+
+            if (!res.ok) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
             return data;
+        }
+
+        function toggleChatbot(forceOpen = null) {
+            const panel = document.getElementById('chatbotPanel');
+            const shouldOpen = forceOpen === null ? !panel.classList.contains('open') : !!forceOpen;
+            panel.classList.toggle('open', shouldOpen);
+            if (shouldOpen) {
+                const input = document.getElementById('chatbotInput');
+                if (input) input.focus();
+            }
+        }
+
+        function addChatbotMessage(role, text) {
+            const box = document.getElementById('chatbotMessages');
+            const msg = document.createElement('div');
+            msg.className = `chat-msg ${role}`;
+            msg.textContent = text;
+            box.appendChild(msg);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function addChatbotHtml(role, html) {
+            const box = document.getElementById('chatbotMessages');
+            const msg = document.createElement('div');
+            msg.className = `chat-msg ${role}`;
+            msg.innerHTML = html;
+            box.appendChild(msg);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function escapeHtml(s) {
+            return String(s)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function formatAgentRichMessage(data) {
+            const message = escapeHtml(data.message || '');
+            const extra = data.data || {};
+
+            let html = `<div>${message.replaceAll('\n', '<br>')}</div>`;
+
+            if (Array.isArray(extra.recommendations) && extra.recommendations.length) {
+                html += '<div class="chat-rich-list">';
+                extra.recommendations.forEach((r, idx) => {
+                    html += `
+                        <div class="chat-rich-item">
+                            <div class="title">${idx + 1}. ${escapeHtml(r.title || ('Book #' + r.book_id))}</div>
+                            <div class="meta">Book ID: ${escapeHtml(r.book_id)} | Score: ${escapeHtml(r.score ?? '-')}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else if (Array.isArray(extra.books) && extra.books.length) {
+                html += '<div class="chat-rich-list">';
+                extra.books.slice(0, 5).forEach((b) => {
+                    html += `
+                        <div class="chat-rich-item">
+                            <div class="title">${escapeHtml(b.title || ('Book #' + b.id))}</div>
+                            <div class="meta">Tác giả: ${escapeHtml(b.author || '-')} | Giá: ${escapeHtml(b.price ?? '-')} đ</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else if (Array.isArray(extra.orders) && extra.orders.length) {
+                html += '<div class="chat-rich-list">';
+                extra.orders.slice(0, 5).forEach((o) => {
+                    html += `
+                        <div class="chat-rich-item">
+                            <div class="title">Đơn #${escapeHtml(o.id)} - ${escapeHtml(o.status || 'pending')}</div>
+                            <div class="meta">Tổng: ${escapeHtml(o.total_amount ?? 0)} đ</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            return html;
+        }
+
+        async function sendChatbotMessage() {
+            const c = getCustomer();
+            if (!c) {
+                showToast('Vui lòng đăng nhập để chat với AI', 'error');
+                window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+
+            const input = document.getElementById('chatbotInput');
+            const text = (input.value || '').trim();
+            if (!text) return;
+
+            addChatbotMessage('user', text);
+            input.value = '';
+
+            try {
+                const body = {
+                    customer_id: c.id,
+                    message: text,
+                };
+                if (chatbotConversationId) body.conversation_id = chatbotConversationId;
+
+                const res = await fetch('/api/agent/chat/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+
+                if (data.conversation_id) chatbotConversationId = data.conversation_id;
+                addChatbotHtml('agent', formatAgentRichMessage(data));
+            } catch (e) {
+                addChatbotMessage('agent', 'Lỗi: ' + e.message);
+            }
+        }
+
+        function sendQuickChat(text) {
+            const input = document.getElementById('chatbotInput');
+            input.value = text;
+            sendChatbotMessage();
         }
 
         // ── Gradient by index ──
@@ -785,7 +1179,7 @@
 
         // ── Require login ──
         function requireLogin() {
-            if (!getCustomer()) {
+            if (!getCustomer() || !getAccessToken()) {
                 window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
                 return false;
             }

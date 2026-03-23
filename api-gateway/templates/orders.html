@@ -17,6 +17,7 @@
 {% block scripts %}
 <script>
 const API = '/api/proxy/orders';
+const CUSTOMER_API = '/api/proxy/customers/';
 const statusTags = { pending:'tag-orange', confirmed:'tag-blue', shipped:'tag-purple', delivered:'tag-green', cancelled:'tag-red' };
 const statusLabels = { pending:'Chờ xử lý', confirmed:'Đã xác nhận', shipped:'Đang giao', delivered:'Đã giao', cancelled:'Đã hủy' };
 
@@ -36,12 +37,56 @@ function actionButtons(o) {
 
 async function loadData() {
     try {
-        const res = await fetch(API + '/'); const items = await res.json();
+        const ordersRes = await fetch(API + '/');
+        const items = await ordersRes.json();
+
+        let customers = [];
+        try {
+            const customersRes = await fetch(CUSTOMER_API);
+            const rawCustomers = await customersRes.json();
+            if (Array.isArray(rawCustomers)) {
+                customers = rawCustomers;
+            } else if (Array.isArray(rawCustomers.results)) {
+                customers = rawCustomers.results;
+            } else if (Array.isArray(rawCustomers.value)) {
+                customers = rawCustomers.value;
+            } else {
+                customers = [];
+            }
+        } catch (e) {
+            customers = [];
+        }
+        const customerMap = {};
+        (Array.isArray(customers) ? customers : []).forEach(c => {
+            customerMap[String(c.id)] = c;
+        });
+
+        // Fallback: if customer list is empty/unavailable, fetch customer details by order ids.
+        if (Object.keys(customerMap).length === 0 && Array.isArray(items) && items.length) {
+            const ids = [...new Set(items.map(o => String(o.customer_id)).filter(Boolean))];
+            await Promise.all(ids.map(async (id) => {
+                try {
+                    const r = await fetch(`/api/proxy/customers/${id}/`);
+                    if (!r.ok) return;
+                    const c = await r.json();
+                    if (c && c.id !== undefined) {
+                        customerMap[String(c.id)] = c;
+                    }
+                } catch (e) {}
+            }));
+        }
+
         const tbody = document.getElementById('tableBody');
         if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📦</div><p>No orders yet.</p></div></td></tr>'; return; }
         tbody.innerHTML = items.map(o => `<tr>
             <td><strong>#${o.id}</strong></td>
-            <td>Customer #${o.customer_id}</td>
+            <td>${(() => {
+                const customerId = String(o.customer_id);
+                const customer = customerMap[customerId];
+                if (!customer) return `Customer #${customerId}`;
+                const label = customer.full_name || customer.name || customer.email || `Customer #${customerId}`;
+                return `${label} (Customer #${customerId})`;
+            })()}</td>
             <td><span class="tag ${statusTags[o.status]||'tag-blue'}">${statusLabels[o.status]||o.status}</span></td>
             <td><span class="tag tag-green">${Number(o.total_amount||0).toLocaleString('vi-VN')} đ</span></td>
             <td style="white-space:nowrap;">${o.created_at ? new Date(o.created_at).toLocaleDateString('vi-VN') : ''}</td>

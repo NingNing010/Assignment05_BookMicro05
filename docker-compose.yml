@@ -1,13 +1,43 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8012:8000"
+    environment:
+      - JWT_SECRET=bookstore-jwt-secret
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_auth
+
   book-service:
     build: ./book-service
     ports:
       - "8002:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_book
 
   cart-service:
     build: ./cart-service
     ports:
       - "8003:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_cart
     depends_on:
       - book-service
 
@@ -15,6 +45,12 @@ services:
     build: ./customer-service
     ports:
       - "8001:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_customer
     depends_on:
       - cart-service
 
@@ -22,6 +58,12 @@ services:
     build: ./staff-service
     ports:
       - "8004:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_staff
     depends_on:
       - book-service
 
@@ -29,6 +71,12 @@ services:
     build: ./manager-service
     ports:
       - "8005:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_manager
     depends_on:
       - staff-service
 
@@ -36,6 +84,12 @@ services:
     build: ./catalog-service
     ports:
       - "8006:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_catalog
     depends_on:
       - book-service
 
@@ -43,17 +97,40 @@ services:
     build: ./pay-service
     ports:
       - "8009:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_pay
 
   ship-service:
     build: ./ship-service
     ports:
       - "8008:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_ship
 
   order-service:
     build: ./order-service
     ports:
       - "8007:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_order
+      - RABBITMQ_ENABLED=true
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_EXCHANGE=bookstore.events
     depends_on:
+      - rabbitmq
       - pay-service
       - ship-service
       - cart-service
@@ -62,6 +139,12 @@ services:
     build: ./comment-rate-service
     ports:
       - "8010:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_comment_rate
     depends_on:
       - book-service
 
@@ -69,15 +152,40 @@ services:
     build: ./recommender-ai-service
     ports:
       - "8011:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_recommender
     depends_on:
       - book-service
       - comment-rate-service
+
+  clothes-service:
+    build: ./clothes-service
+    ports:
+      - "8013:8000"
+    environment:
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_clothes
 
   api-gateway:
     build: ./api-gateway
     ports:
       - "8000:8000"
+    environment:
+      - JWT_SECRET=bookstore-jwt-secret
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=bookstore_user
+      - DB_PASSWORD=mattroi010
+      - DB_NAME=bookstore_gateway
     depends_on:
+      - auth-service
       - customer-service
       - book-service
       - cart-service
@@ -89,3 +197,4 @@ services:
       - pay-service
       - comment-rate-service
       - recommender-ai-service
+      - clothes-service

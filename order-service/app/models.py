@@ -4,7 +4,10 @@ from django.db import models
 class Order(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('payment_reserved', 'Payment Reserved'),
+        ('shipping_reserved', 'Shipping Reserved'),
         ('confirmed', 'Confirmed'),
+        ('compensating', 'Compensating'),
         ('shipped', 'Shipped'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
@@ -29,3 +32,12 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"Book {self.book_id} x{self.quantity}"
+
+
+class SagaEvent(models.Model):
+    topic = models.CharField(max_length=120)
+    payload = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.topic} @ {self.created_at.isoformat()}"

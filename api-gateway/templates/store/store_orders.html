@@ -99,8 +99,8 @@
     };
 
     async function loadOrders() {
+        if (!requireLogin()) return;
         const c = getCustomer();
-        if (!c) { window.location.href = '/store/login/?next=/store/orders/'; return; }
 
         try {
             const orders = await apiCall('/api/proxy/orders/');
@@ -173,19 +173,10 @@
         const msgs = { cancelled: 'Bạn có chắc muốn hủy đơn hàng này?', delivered: 'Xác nhận đã nhận hàng?' };
         if (!confirm(msgs[newStatus] || 'Xác nhận?')) return;
         try {
-            const res = await fetch(`/api/proxy/orders/${orderId}/`, {
-                method: 'PATCH',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({status: newStatus})
-            });
-            if (res.ok) {
-                const labels = { cancelled: 'Đã hủy đơn hàng', delivered: 'Đã xác nhận nhận hàng! 📬' };
-                showToast(labels[newStatus] || 'Cập nhật thành công');
-                loadOrders();
-            } else {
-                const err = await res.json();
-                showToast(err.error || 'Lỗi cập nhật', 'error');
-            }
+            await apiCall(`/api/proxy/orders/${orderId}/`, 'PATCH', {status: newStatus});
+            const labels = { cancelled: 'Đã hủy đơn hàng', delivered: 'Đã xác nhận nhận hàng! 📬' };
+            showToast(labels[newStatus] || 'Cập nhật thành công');
+            loadOrders();
         } catch(e) {
             showToast('Lỗi: ' + e.message, 'error');
         }

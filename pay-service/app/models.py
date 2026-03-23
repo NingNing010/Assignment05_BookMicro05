@@ -4,8 +4,10 @@ from django.db import models
 class Payment(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('reserved', 'Reserved'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
+        ('released', 'Released'),
         ('refunded', 'Refunded'),
     ]
     METHOD_CHOICES = [

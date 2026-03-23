@@ -157,8 +157,8 @@
     let booksMap = {};
 
     async function loadCart() {
+        if (!requireLogin()) return;
         const c = getCustomer();
-        if (!c) { window.location.href = '/store/login/?next=/store/cart/'; return; }
 
         try {
             const [cartRes, booksRes] = await Promise.all([
@@ -295,8 +295,8 @@
     }
 
     async function placeOrder() {
+        if (!requireLogin()) return;
         const c = getCustomer();
-        if (!c) return;
         try {
             await apiCall('/api/proxy/orders/', 'POST', { customer_id: c.id });
             showToast('🎉 Đặt hàng thành công!');

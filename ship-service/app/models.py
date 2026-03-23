@@ -4,9 +4,11 @@ from django.db import models
 class Shipment(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('reserved', 'Reserved'),
         ('processing', 'Processing'),
         ('shipped', 'Shipped'),
         ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
     ]
 
     order_id = models.IntegerField()

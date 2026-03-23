@@ -38,4 +38,11 @@ urlpatterns = [
     # Generic API Proxy for frontend CRUD
     path('api/proxy/<str:service>/', views.api_proxy, name='api_proxy'),
     path('api/proxy/<str:service>/<path:path>', views.api_proxy, name='api_proxy_detail'),
+
+    # Central auth-service proxy
+    path('api/auth/<path:path>', views.auth_proxy, name='auth_proxy'),
+
+    # Gateway health
+    path('health/live/', views.health_live, name='gateway_health_live'),
+    path('health/ready/', views.health_ready, name='gateway_health_ready'),
 ]

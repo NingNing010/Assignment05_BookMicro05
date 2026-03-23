@@ -6,7 +6,7 @@
 **Môn học:** Kiến trúc phần mềm  
 **Giảng viên:** Thầy Trần Đình Quế  
 **Sinh viên:** Lê Đăng Ninh  
-**Bài tập:** Assignment 05 — BookStore Microservice Implementation  
+**Bài tập:** Assignment 05 & 06 — BookStore Microservice Implementation  
 **Repository:** https://github.com/NingNing010/Assignment05_BookMicro05  
 **Ngày:** 10/03/2026  
 
@@ -26,7 +26,8 @@
 10. [Docker Deployment](#10-docker-deployment)
 11. [Order Lifecycle & Business Logic](#11-order-lifecycle--business-logic)
 12. [API Documentation tổng hợp](#12-api-documentation-tổng-hợp)
-13. [Kết luận và hướng phát triển](#13-kết-luận-và-hướng-phát-triển)
+13. [Nâng cấp Assignment 06 (Industry-level)](#13-nâng-cấp-assignment-06-industry-level)
+14. [Kết luận và hướng phát triển](#14-kết-luận-và-hướng-phát-triển)
 
 ---
 
@@ -1015,9 +1016,190 @@ Customer (Browser)                API Gateway              order-service        
 
 ---
 
-## 13. KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
+## 13. NÂNG CẤP ASSIGNMENT 06 (INDUSTRY-LEVEL)
 
-### 13.1. Kết quả đạt được
+Assignment 06 yêu cầu nâng cấp hệ thống từ mức học thuật (Assignment 05) lên mức gần production. Phần này mô tả thiết kế nâng cấp để đáp ứng đầy đủ yêu cầu bài 06, đồng thời giữ nguyên domain và service decomposition đã làm ở bài 05.
+
+### 13.1. JWT Authentication Service (Central Auth)
+
+#### Mục tiêu
+- Tách xác thực thành một `auth-service` độc lập.
+- Áp dụng RBAC (Role-Based Access Control): `customer`, `staff`, `manager`, `admin`.
+- API Gateway kiểm tra tính hợp lệ JWT trước khi forward request.
+
+#### Đề xuất kiến trúc
+- Thêm service mới: `auth-service` (port đề xuất: 8012).
+- Endpoint chính:
+  - `POST /auth/register/`
+  - `POST /auth/login/`
+  - `POST /auth/refresh/`
+  - `POST /auth/validate/`
+  - `GET /auth/me/`
+- JWT payload gợi ý: `sub`, `email`, `role`, `iat`, `exp`, `jti`.
+- Gateway policy:
+  - Public routes: login/register, trang công khai.
+  - Protected routes: mọi endpoint quản trị và thao tác nghiệp vụ nhạy cảm.
+  - Role enforcement ví dụ:
+    - `admin-panel/*` chỉ `admin`/`manager`.
+    - Staff APIs chỉ `staff` trở lên.
+    - Customer APIs yêu cầu `customer` và chỉ truy cập tài nguyên của chính mình.
+
+#### Kết quả mong đợi
+- Không còn mô hình đăng nhập localStorage thuần phía client.
+- Mọi request nghiệp vụ đi kèm `Authorization: Bearer <token>`.
+- Giảm nguy cơ giả mạo request giữa các role.
+
+### 13.2. Saga Pattern cho Distributed Transactions
+
+Assignment 06 yêu cầu tạo đơn hàng theo mô hình Saga orchestration thay vì chỉ gọi REST tuần tự đơn giản.
+
+#### Saga Orchestrator Flow
+1. `OrderCreated(PENDING)`
+2. `PaymentReserved`
+3. `ShippingReserved`
+4. `OrderConfirmed`
+5. Nếu có lỗi ở bước 2/3: chạy compensating actions
+
+#### Compensating Actions
+- Nếu reserve payment thành công nhưng reserve shipping thất bại:
+  - Publish `ReleasePayment`
+  - Cập nhật order `CANCELLED`
+- Nếu reserve shipping thành công nhưng confirm order thất bại:
+  - Publish `ReleaseShipping`
+  - Publish `ReleasePayment`
+  - Cập nhật order `CANCELLED`
+
+#### Trạng thái Order mở rộng
+- `pending`
+- `payment_reserved`
+- `shipping_reserved`
+- `confirmed`
+- `cancelled`
+- `compensating`
+
+Với cách này, hệ thống đạt tính nhất quán nghiệp vụ theo mô hình eventual consistency phù hợp kiến trúc phân tán.
+
+### 13.3. Event Bus Integration (RabbitMQ/Kafka)
+
+#### Mục tiêu
+- Giảm phụ thuộc REST coupling đồng bộ giữa services.
+- Tách producer/consumer để tăng khả năng mở rộng và chống lỗi dây chuyền.
+
+#### Event topics/queues đề xuất
+- `order.created`
+- `payment.reserve.requested`
+- `payment.reserved`
+- `payment.failed`
+- `shipping.reserve.requested`
+- `shipping.reserved`
+- `shipping.failed`
+- `order.confirmed`
+- `order.cancelled`
+
+#### RabbitMQ routing mẫu
+- Exchange: `bookstore.events` (topic)
+- Routing key theo domain event (`order.*`, `payment.*`, `shipping.*`)
+- Queue tách theo bounded context:
+  - `order-service.saga`
+  - `pay-service.commands`
+  - `ship-service.commands`
+  - `notification-service.events` (nếu mở rộng)
+
+### 13.4. API Gateway Responsibilities (Mức Production)
+
+So với Assignment 05, Gateway cần mở rộng 4 trách nhiệm chính:
+
+1. Routing
+- Duy trì định tuyến tập trung tới toàn bộ backend services.
+
+2. Authentication validation
+- Kiểm tra JWT signature/expiry hoặc gọi `auth-service /auth/validate/`.
+
+3. Logging
+- Gắn `request_id` cho mỗi request.
+- Log cấu trúc JSON: method, path, user_id, role, latency, status_code.
+
+4. Rate limiting
+- Áp dụng theo IP hoặc theo user/token.
+- Đề xuất chính sách:
+  - Guest: 60 req/min
+  - Authenticated customer: 120 req/min
+  - Admin/staff internal: 300 req/min
+
+### 13.5. Observability
+
+Assignment 06 yêu cầu đầy đủ monitoring ở cấp hệ thống.
+
+#### Centralized Logging
+- Thu thập log từ toàn bộ containers.
+- Stack đề xuất: ELK hoặc Loki + Grafana.
+
+#### Health Endpoints
+- Mỗi service cung cấp:
+  - `GET /health/live` (process còn sống)
+  - `GET /health/ready` (DB/broker sẵn sàng)
+
+#### Metrics Endpoint
+- `GET /metrics` theo Prometheus format.
+- Chỉ số tối thiểu:
+  - Request count theo endpoint/method/status
+  - Request latency (p50, p95, p99)
+  - Error rate
+  - Message consume lag (nếu dùng broker)
+
+### 13.6. Advanced Deliverables (Bài 06)
+
+Theo đề bài, hệ thống hoàn thiện cần có các deliverables sau:
+
+1. Implement Saga pattern
+- Có orchestrator rõ ràng, có compensating transaction.
+
+2. Integrate message broker
+- Tối thiểu 1 luồng nghiệp vụ chạy bất đồng bộ qua RabbitMQ/Kafka.
+
+3. Implement JWT
+- Có auth-service tập trung, role claims, token validation tại gateway.
+
+4. Provide fault simulation
+- Mô phỏng lỗi có kiểm soát, ví dụ:
+  - Tắt `ship-service` giữa luồng đặt hàng
+  - Trả lỗi giả lập từ `pay-service`
+- Quan sát system behavior và chứng minh compensation hoạt động.
+
+5. Provide load testing results
+- Dùng k6/JMeter/Locust kiểm thử tải:
+  - Throughput
+  - Avg latency
+  - Error rate
+  - Saturation điểm nghẽn
+
+6. Architecture justification report
+- Giải thích vì sao chọn Saga orchestration, vì sao event-driven giảm coupling, và đánh đổi so với REST synchronous.
+
+### 13.7. Kế hoạch triển khai đề xuất cho codebase hiện tại
+
+Pha 1 (Security Foundation):
+- Thêm `auth-service` và JWT issuance.
+- Bổ sung middleware verify JWT tại API Gateway.
+
+Pha 2 (Transaction Reliability):
+- Refactor `order-service` thành Saga orchestrator.
+- Thêm trạng thái trung gian (`payment_reserved`, `shipping_reserved`, `compensating`).
+
+Pha 3 (Async Integration):
+- Tích hợp RabbitMQ.
+- Chuyển luồng reserve payment/shipping sang event-driven.
+
+Pha 4 (Operational Excellence):
+- Chuẩn hóa health/metrics/logging.
+- Thêm rate limiting tại gateway.
+- Viết kịch bản fault injection + load test report.
+
+---
+
+## 14. KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
+
+### 14.1. Kết quả đạt được
 
 - ✅ Triển khai thành công **12 microservices** với đầy đủ CRUD operations
 - ✅ **API Gateway** với generic proxy pattern, routing tới 11 backend services
@@ -1028,8 +1210,9 @@ Customer (Browser)                API Gateway              order-service        
 - ✅ **Inter-service communication** qua HTTP REST với fault tolerance
 - ✅ **Recommender AI** tính toán gợi ý sách dựa trên reviews và ratings
 - ✅ **Source control** trên GitHub với commit history rõ ràng
+- ✅ Đã xây dựng blueprint nâng cấp theo đầy đủ yêu cầu **Assignment 06** (JWT, Saga, Event Bus, Observability)
 
-### 13.2. Nguyên tắc thiết kế đã áp dụng
+### 14.2. Nguyên tắc thiết kế đã áp dụng
 
 | Nguyên tắc | Mô tả |
 |-----------|-------|
@@ -1040,8 +1223,10 @@ Customer (Browser)                API Gateway              order-service        
 | **Fault Tolerance** | Graceful handling khi service phụ thuộc down |
 | **Loose Coupling** | Services giao tiếp qua HTTP API, không share database |
 | **Independent Deployment** | Mỗi service build/deploy riêng trong Docker |
+| **Security by Gateway** | Xác thực và phân quyền tập trung tại API Gateway + auth-service |
+| **Event-Driven Reliability** | Saga + Event Bus giúp giảm coupling và tăng khả năng phục hồi |
 
-### 13.3. Hạn chế
+### 14.3. Hạn chế
 
 - Sử dụng **SQLite** (không phù hợp production, nên dùng PostgreSQL/MySQL)
 - Chưa có **authentication/authorization** đầy đủ (JWT tokens, OAuth2)
@@ -1050,8 +1235,10 @@ Customer (Browser)                API Gateway              order-service        
 - Chưa có **health check endpoints** cho Docker health monitoring
 - Chưa có **centralized logging** (ELK stack) và **monitoring** (Prometheus/Grafana)
 - Chưa có **API rate limiting** và **circuit breaker** pattern
+- Chưa triển khai thực tế **message broker** trong môi trường production-like
+- Chưa có kết quả benchmark đầy đủ cho high concurrency
 
-### 13.4. Hướng phát triển
+### 14.4. Hướng phát triển
 
 - Chuyển sang **PostgreSQL** cho production database
 - Thêm **JWT Authentication** middleware cho tất cả API endpoints
@@ -1062,6 +1249,8 @@ Customer (Browser)                API Gateway              order-service        
 - Tích hợp **LLM** (GPT/Gemini) thay thế regex-based intent parsing cho AI Agent
 - Thêm **Elasticsearch** cho full-text search sách
 - Cài đặt **Redis** cho caching và session storage
+- Hoàn thiện `auth-service` và RBAC policy matrix chi tiết cho từng endpoint
+- Chuẩn hóa quy trình chaos testing/fault injection định kỳ
 
 ---
 

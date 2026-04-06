@@ -1,0 +1,208 @@
+{% extends "store/store_base.html" %}
+{% block title %}Đánh giá sách{% endblock %}
+{% block nav_reviews %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .reviews-layout {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px;
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 24px;
+    }
+
+    .review-form-card,
+    .my-reviews-card {
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 22px;
+    }
+
+    .review-row {
+        border-bottom: 1px solid var(--border);
+        padding: 14px 0;
+    }
+
+    .review-row:last-child { border-bottom: none; }
+
+    .review-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .review-meta {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
+
+    .star-select {
+        display: flex;
+        gap: 6px;
+        margin: 10px 0 14px;
+    }
+
+    .star-select span {
+        font-size: 1.5rem;
+        cursor: pointer;
+        opacity: 0.3;
+        transition: transform 0.15s;
+    }
+
+    .star-select span.active { opacity: 1; }
+    .star-select span:hover { transform: scale(1.15); }
+
+    @media (max-width: 900px) {
+        .reviews-layout {
+            grid-template-columns: 1fr;
+            padding: 18px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="section" style="padding-bottom:0">
+    <div class="section-header">
+        <div>
+            <div class="section-title">⭐ Đánh giá sách</div>
+            <div class="section-subtitle" id="reviewSubtitle">Đang tải...</div>
+        </div>
+    </div>
+</section>
+
+<div class="reviews-layout">
+    <div class="review-form-card">
+        <h3 style="font-size:1rem;margin-bottom:12px">✍️ Viết đánh giá mới</h3>
+
+        <div class="form-group">
+            <label class="form-label">Chọn sách đã mua</label>
+            <select id="bookSelect" class="form-control">
+                <option value="">-- Chọn sách --</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Số sao</label>
+            <div class="star-select" id="starSelect">
+                <span onclick="setRating(1)">⭐</span>
+                <span onclick="setRating(2)">⭐</span>
+                <span onclick="setRating(3)">⭐</span>
+                <span onclick="setRating(4)">⭐</span>
+                <span onclick="setRating(5)">⭐</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Nhận xét</label>
+            <textarea id="reviewComment" class="form-control" rows="4" placeholder="Chia sẻ cảm nhận của bạn..."></textarea>
+        </div>
+
+        <button class="btn btn-navy btn-block" onclick="submitReview()">Gửi đánh giá</button>
+    </div>
+
+    <div class="my-reviews-card">
+        <h3 style="font-size:1rem;margin-bottom:12px">🧾 Đánh giá của tôi</h3>
+        <div id="myReviewsList"><div class="spinner"></div></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let selectedRating = 5;
+    let booksMap = {};
+
+    function setRating(n) {
+        selectedRating = n;
+        document.querySelectorAll('#starSelect span').forEach((s, i) => {
+            s.classList.toggle('active', i < n);
+        });
+    }
+
+    async function loadReviewsPage() {
+        if (!requireLogin()) return;
+        const c = getCustomer();
+
+        try {
+            const [orders, books, reviews] = await Promise.all([
+                apiCall('/api/proxy/orders/'),
+                apiCall('/api/proxy/books/'),
+                apiCall('/api/proxy/reviews/')
+            ]);
+
+            (Array.isArray(books) ? books : []).forEach(b => booksMap[b.id] = b);
+
+            const myOrders = (Array.isArray(orders) ? orders : []).filter(o => o.customer_id === c.id);
+            const boughtBookIds = [...new Set(
+                myOrders.flatMap(o => Array.isArray(o.items) ? o.items.map(i => i.book_id) : [])
+            )];
+
+            const select = document.getElementById('bookSelect');
+            select.innerHTML = '<option value="">-- Chọn sách --</option>';
+            boughtBookIds.forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = booksMap[id]?.title || `Sách #${id}`;
+                select.appendChild(opt);
+            });
+
+            const myReviews = (Array.isArray(reviews) ? reviews : []).filter(r => r.customer_id === c.id);
+            document.getElementById('reviewSubtitle').textContent = `Bạn đã đánh giá ${myReviews.length} sách`;
+
+            const list = document.getElementById('myReviewsList');
+            if (!myReviews.length) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">Chưa có đánh giá nào</div><div class="empty-desc">Bạn hãy đặt hàng và đánh giá sách đã mua.</div></div>';
+                return;
+            }
+
+            list.innerHTML = myReviews
+                .sort((a, b) => (b.id || 0) - (a.id || 0))
+                .map(r => `
+                    <div class="review-row">
+                        <div class="review-title">${booksMap[r.book_id]?.title || ('Sách #' + r.book_id)}</div>
+                        <div class="review-meta">${'⭐'.repeat(r.rating || 0)} • Customer #${r.customer_id}</div>
+                        <div style="font-size:0.9rem;color:var(--text-body)">${r.comment || ''}</div>
+                    </div>
+                `).join('');
+        } catch (e) {
+            document.getElementById('myReviewsList').innerHTML = `<div style="color:#c0392b">Lỗi tải dữ liệu: ${e.message}</div>`;
+        }
+    }
+
+    async function submitReview() {
+        const c = getCustomer();
+        if (!c) return;
+
+        const bookId = parseInt(document.getElementById('bookSelect').value || '0', 10);
+        const comment = document.getElementById('reviewComment').value.trim();
+
+        if (!bookId) {
+            showToast('Vui lòng chọn sách đã mua để đánh giá', 'error');
+            return;
+        }
+
+        try {
+            await apiCall('/api/proxy/reviews/', 'POST', {
+                book_id: bookId,
+                customer_id: c.id,
+                rating: selectedRating,
+                comment
+            });
+            showToast('Đã gửi đánh giá thành công!');
+            document.getElementById('reviewComment').value = '';
+            setRating(5);
+            loadReviewsPage();
+        } catch (e) {
+            showToast('Không thể gửi đánh giá: ' + e.message, 'error');
+        }
+    }
+
+    setRating(5);
+    loadReviewsPage();
+</script>
+{% endblock %}

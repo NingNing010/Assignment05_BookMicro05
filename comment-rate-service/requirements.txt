@@ -2,6 +2,7 @@
 djangorestframework
 requests
 PyMySQL
+scikit-learn
 
 
 cryptography

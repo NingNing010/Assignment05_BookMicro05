@@ -206,6 +206,8 @@ class AgentHelpView(APIView):
                 {"action": "view_orders", "examples": ["view my orders", "xem đơn hàng"]},
                 {"action": "rate_book", "examples": ["rate book #2 5 stars Great!", "đánh giá sách #2 5 sao"]},
                 {"action": "get_reviews", "examples": ["reviews for book #1", "đánh giá sách #1"]},
+                {"action": "check_book_stock", "examples": ["stock book #1", "tồn kho sách #1"]},
+                {"action": "top_rated_books", "examples": ["top rated books", "sách đánh giá cao"]},
                 {"action": "get_recommendations", "examples": ["recommend", "gợi ý sách"]},
             ]
         })

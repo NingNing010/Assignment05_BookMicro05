@@ -53,7 +53,7 @@
             </div>
             <div class="form-group">
                 <label>Stock *</label>
-                <input class="form-control" id="fStock" type="number" placeholder="100">
+                <input class="form-control" id="fStock" type="number" min="1" step="1" placeholder="100">
             </div>
         </div>
         <div class="form-row">
@@ -163,11 +163,18 @@ function editBook(b) {
 
 async function saveBook() {
     const id = document.getElementById('editId').value;
+    const stockRaw = document.getElementById('fStock').value;
+    const stockInt = Number(stockRaw);
+    if (!Number.isInteger(stockInt) || stockInt <= 0) {
+        showToast('Stock phải là số nguyên và lớn hơn 0', 'error');
+        return;
+    }
+
     const body = {
         title: document.getElementById('fTitle').value,
         author: document.getElementById('fAuthor').value,
         price: document.getElementById('fPrice').value,
-        stock: parseInt(document.getElementById('fStock').value) || 0,
+        stock: stockInt,
         isbn: document.getElementById('fIsbn').value,
         description: document.getElementById('fDescription').value,
         category: document.getElementById('fCategory').value || null,

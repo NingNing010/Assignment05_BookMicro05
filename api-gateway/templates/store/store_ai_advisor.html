@@ -1,0 +1,387 @@
+{% extends 'store/store_base.html' %}
+{% block title %}AI Tư vấn hành vi - BookStore{% endblock %}
+{% block nav_ai_advisor %}active{% endblock %}
+
+{% block extra_css %}
+.chat-wrap {
+    max-width: 980px;
+    margin: 28px auto;
+    padding: 0 20px 24px;
+}
+.ai-panel {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+.ai-head {
+    background: linear-gradient(135deg, #1f4e79 0%, #2f7fb6 100%);
+    color: #fff;
+    padding: 18px 20px;
+}
+.ai-head h2 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+.ai-head p {
+    margin: 6px 0 0;
+    opacity: .92;
+    font-size: .9rem;
+}
+.ai-body {
+    padding: 16px;
+}
+.ai-row {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+.ai-row label {
+    font-weight: 600;
+    color: #293241;
+}
+.ai-row input, .ai-row textarea {
+    width: 100%;
+    border: 1px solid #d9e2ec;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: .94rem;
+}
+.ai-row textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+.ai-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.ai-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.ai-btn.primary {
+    background: #2f7fb6;
+    color: #fff;
+}
+.ai-btn.secondary {
+    background: #edf2f7;
+    color: #2d3748;
+}
+.ai-output {
+    margin-top: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    background: #f8fbff;
+}
+.ai-output pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    font-size: .92rem;
+    color: #1a202c;
+}
+
+.quick-prompts {
+    margin-top: 14px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
+}
+.quick-prompts h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    color: #1f2937;
+}
+.prompt-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.prompt-card {
+    border: 1px solid #d9e2ec;
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    color: #1f2937;
+    transition: all 0.2s;
+}
+.prompt-card:hover {
+    background: #f8fbff;
+    border-color: #2f7fb6;
+}
+.prompt-card strong {
+    display: block;
+    margin-bottom: 4px;
+}
+.prompt-card span {
+    font-size: .9rem;
+    color: #4b5563;
+}
+
+/* ── Book Recommendations Section ── */
+.recommendations-section {
+    margin-top: 18px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 14px;
+    display: none;
+}
+.recommendations-section.show {
+    display: block;
+}
+.recommendations-section h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    color: #1f2937;
+    font-weight: 600;
+}
+.book-recommendations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+}
+.book-rec-card {
+    border: 1px solid #d9e2ec;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+.book-rec-card:hover {
+    border-color: #2f7fb6;
+    box-shadow: 0 4px 12px rgba(47, 127, 182, 0.15);
+    transform: translateY(-2px);
+}
+.book-rec-cover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 24px 16px;
+    text-align: center;
+    font-size: 2rem;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+.book-rec-cover.cat-1 { background: linear-gradient(135deg, #e94560, #c0392b); }
+.book-rec-cover.cat-2 { background: linear-gradient(135deg, #3498db, #2980b9); }
+.book-rec-cover.cat-3 { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.book-rec-cover.cat-4 { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.book-rec-info {
+    padding: 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.book-rec-title {
+    font-weight: 600;
+    font-size: .9rem;
+    color: #1f2937;
+    margin-bottom: 4px;
+    line-height: 1.3;
+    flex: 1;
+}
+.book-rec-author {
+    font-size: .8rem;
+    color: #4b5563;
+    margin-bottom: 6px;
+}
+.book-rec-price {
+    font-weight: 600;
+    color: #2f7fb6;
+    font-size: .9rem;
+    margin-bottom: 6px;
+}
+.book-rec-action {
+    border: none;
+    background: #2f7fb6;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+.book-rec-action:hover {
+    background: #1e4e8f;
+}
+.book-rec-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+    .ai-row {
+        grid-template-columns: 1fr;
+    }
+    .prompt-grid {
+        grid-template-columns: 1fr;
+    }
+    .book-recommendations-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="chat-wrap">
+    <div class="ai-panel">
+        <div class="ai-head">
+            <h2>AI Tư vấn hành vi khách hàng (RAG + Deep Learning)</h2>
+            <p>Sử dụng model_behavior và Knowledge Base để gợi ý chăm sóc, upsell, giữ chân khách hàng.</p>
+        </div>
+        <div class="ai-body">
+            <div class="ai-row">
+                <label for="customerId">Customer ID</label>
+                <input id="customerId" type="number" min="1" placeholder="Ví dụ: 1">
+            </div>
+            <div class="ai-row">
+                <label for="question">Câu hỏi tư vấn</label>
+                <textarea id="question" placeholder="Ví dụ: Tôi muốn mua 1 cuốn sách về AI thì nên chọn gì?"></textarea>
+            </div>
+            <div class="ai-actions">
+                <button class="ai-btn primary" onclick="askAdvisor()">Hỏi AI tư vấn</button>
+            </div>
+
+            <div class="ai-output" id="outputBox" style="display:none;">
+                <pre id="outputText"></pre>
+            </div>
+
+            <div class="recommendations-section" id="recommendationsSection">
+                <h3>📚 Sách được đề xuất</h3>
+                <div class="book-recommendations-grid" id="bookRecommendationsGrid"></div>
+            </div>
+
+            <div class="quick-prompts">
+                <h3>Câu hỏi mẫu để ra câu trả lời khác nhau</h3>
+                <div class="prompt-grid">
+                    <button class="prompt-card" type="button" onclick="fillQuestion('Tôi ghét cuốn sách này và rất thất vọng, nên xử lý thế nào?')">
+                        <strong>1. Phàn nàn / tiêu cực</strong>
+                        <span>Tôi ghét cuốn sách này và rất thất vọng, nên xử lý thế nào?</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQuestion('Tôi muốn mua 1 cuốn sách về AI, nên chọn gì?')">
+                        <strong>2. Mua sách / gợi ý</strong>
+                        <span>Tôi muốn mua 1 cuốn sách về AI, nên chọn gì?</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQuestion('Tôi thích cuốn sách này, có nên mua thêm sách cùng chủ đề không?')">
+                        <strong>3. Tích cực / upsell nhẹ</strong>
+                        <span>Tôi thích cuốn sách này, có nên mua thêm sách cùng chủ đề không?</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQuestion('Khách hàng này cần tư vấn gì cho phù hợp?')">
+                        <strong>4. Câu hỏi chung</strong>
+                        <span>Khách hàng này cần tư vấn gì cho phù hợp?</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function formatPrice(price) {
+    return (price || 0).toLocaleString('vi-VN');
+}
+
+async function askAdvisor() {
+    const customerId = document.getElementById('customerId').value;
+    const question = (document.getElementById('question').value || '').trim();
+    if (!question) {
+        alert('Vui lòng nhập câu hỏi.');
+        return;
+    }
+
+    const payload = {question};
+    if (customerId) payload.customer_id = Number(customerId);
+
+    try {
+        const res = await fetch('/api/proxy/reviews/rag/chat/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        showResult(data.answer || data.error || 'Chưa có câu trả lời.', data.recommended_books || []);
+    } catch (e) {
+        showResult(`Lỗi tư vấn: ${e.message}`, []);
+    }
+}
+
+function showResult(text, recommendedBooks) {
+    const box = document.getElementById('outputBox');
+    const out = document.getElementById('outputText');
+    box.style.display = 'block';
+    out.textContent = text;
+
+    // Show recommendations if available
+    const recSection = document.getElementById('recommendationsSection');
+    if (recommendedBooks && recommendedBooks.length > 0) {
+        recSection.classList.add('show');
+        renderRecommendations(recommendedBooks);
+    } else {
+        recSection.classList.remove('show');
+    }
+}
+
+function renderRecommendations(books) {
+    const grid = document.getElementById('bookRecommendationsGrid');
+    const colors = ['cat-1', 'cat-2', 'cat-3', 'cat-4'];
+    
+    grid.innerHTML = books.map((book, idx) => {
+        const colorClass = colors[idx % colors.length];
+        const stockText = book.stock > 5 ? 'Còn hàng' : book.stock > 0 ? `Còn ${book.stock}` : 'Hết hàng';
+        const isOutOfStock = book.stock < 1;
+        
+        return `
+            <div class="book-rec-card">
+                <div class="book-rec-cover ${colorClass}">📖</div>
+                <div class="book-rec-info">
+                    <div class="book-rec-title">${book.title}</div>
+                    <div class="book-rec-author">✍️ ${book.author}</div>
+                    <div class="book-rec-price">${formatPrice(book.price)} ₫</div>
+                    <button class="book-rec-action" ${isOutOfStock ? 'disabled' : ''} onclick="addToCart(${book.id})">${isOutOfStock ? 'Hết hàng' : '🛒 Thêm'}</button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+async function addToCart(bookId) {
+    const c = getCustomer?.();
+    if (!c) {
+        window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
+        return;
+    }
+    try {
+        await fetch('/api/proxy/cart-items/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ customer_id: c.id, book_id: bookId, quantity: 1 })
+        });
+        alert('Đã thêm vào giỏ hàng! 🛒');
+    } catch(e) {
+        alert('Lỗi: ' + e.message);
+    }
+}
+
+function fillQuestion(text) {
+    document.getElementById('question').value = text;
+    document.getElementById('question').focus();
+}
+
+function getCustomer() {
+    const data = localStorage.getItem('store_customer');
+    return data ? JSON.parse(data) : null;
+}
+</script>
+{% endblock %}

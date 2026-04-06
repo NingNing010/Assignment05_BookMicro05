@@ -96,14 +96,8 @@ def tool_view_cart(customer_id):
 
 def tool_add_to_cart(customer_id, book_id, quantity=1):
     """Add a book to the customer's cart."""
-    # First get the cart for this customer
-    cart_result = safe_request("get", f"{CART_SERVICE_URL}/carts/{customer_id}/")
-
-    # We need the cart ID — get all carts or try to find it
-    # The cart was auto-created when customer registered
-    # We'll post directly with cart lookup
     result = safe_request("post", f"{CART_SERVICE_URL}/cart-items/", json={
-        "cart": customer_id,  # cart ID typically matches sequence
+        "customer_id": customer_id,
         "book_id": book_id,
         "quantity": quantity,
     })
@@ -118,6 +112,20 @@ def tool_add_to_cart(customer_id, book_id, quantity=1):
 
 def tool_place_order(customer_id, payment_method="credit_card", shipping_method="standard"):
     """Place an order from current cart contents."""
+    method_raw = (payment_method or "").lower()
+    payment_map = {
+        "cod": "cod",
+        "cash": "cod",
+        "cash_on_delivery": "cod",
+        "chuyen_khoan": "bank_transfer",
+        "bank_transfer": "bank_transfer",
+        "transfer": "bank_transfer",
+        "credit_card": "credit_card",
+        "debit_card": "debit_card",
+        "paypal": "paypal",
+    }
+    payment_method = payment_map.get(method_raw, "credit_card")
+
     result = safe_request("post", f"{ORDER_SERVICE_URL}/orders/", json={
         "customer_id": customer_id,
         "payment_method": payment_method,
@@ -249,6 +257,72 @@ def tool_view_book(book_id):
     }
 
 
+def tool_check_book_stock(book_id):
+    """Check stock availability for a single book."""
+    result = safe_request("get", f"{BOOK_SERVICE_URL}/books/{book_id}/")
+    if not result["success"]:
+        return result
+    b = result["data"]
+    stock = int(b.get("stock") or 0)
+    if stock <= 0:
+        msg = f"'{b.get('title', f'Book #{book_id}')}' is OUT OF STOCK."
+    elif stock <= 5:
+        msg = f"'{b.get('title', f'Book #{book_id}')}' is LOW STOCK: {stock} left."
+    else:
+        msg = f"'{b.get('title', f'Book #{book_id}')}' is available: {stock} in stock."
+    return {"success": True, "message": msg, "book": b}
+
+
+def tool_top_rated_books(limit=5):
+    """Get top-rated books based on reviews."""
+    reviews_result = safe_request("get", f"{COMMENT_RATE_SERVICE_URL}/reviews/")
+    if not reviews_result["success"]:
+        return reviews_result
+
+    books_result = safe_request("get", f"{BOOK_SERVICE_URL}/books/")
+    if not books_result["success"]:
+        return books_result
+
+    reviews = reviews_result["data"] or []
+    books = books_result["data"] or []
+    if not reviews:
+        return {"success": True, "message": "No ratings yet.", "top_books": []}
+
+    stats = {}
+    for r in reviews:
+        bid = r.get("book_id")
+        rating = int(r.get("rating") or 0)
+        if not bid:
+            continue
+        row = stats.setdefault(bid, {"sum": 0, "count": 0})
+        row["sum"] += rating
+        row["count"] += 1
+
+    books_map = {b.get("id"): b for b in books}
+    ranked = []
+    for bid, row in stats.items():
+        if row["count"] == 0:
+            continue
+        avg = row["sum"] / row["count"]
+        book = books_map.get(bid, {})
+        ranked.append({
+            "book_id": bid,
+            "title": book.get("title") or f"Book #{bid}",
+            "author": book.get("author", ""),
+            "avg_rating": round(avg, 2),
+            "review_count": row["count"],
+            "stock": book.get("stock"),
+        })
+
+    ranked.sort(key=lambda x: (-x["avg_rating"], -x["review_count"]))
+    top = ranked[:limit]
+    return {
+        "success": True,
+        "message": f"Top {len(top)} rated book(s):",
+        "top_books": top,
+    }
+
+
 # ══════════════════════════════════════════════
 # INTENT PARSER — maps natural language to tools
 # ══════════════════════════════════════════════
@@ -277,6 +351,18 @@ INTENT_PATTERNS = [
      "get_reviews"),
     (r"(?:đánh\s*giá|review)\s+(?:của\s+)?(?:sách\s*)?#?(\d+)",
      "get_reviews"),
+
+    # Stock checks
+    (r"(?:stock|inventory|availability)\s+(?:for\s+)?(?:book\s*)?#?(\d+)",
+     "check_book_stock"),
+    (r"(?:tồn\s*kho|còn\s*hàng|hết\s*hàng)\s+(?:của\s+)?(?:sách\s*)?#?(\d+)",
+     "check_book_stock"),
+
+    # Top rated books
+    (r"(?:top|best)\s*(?:rated|rating)\s*books?",
+     "top_rated_books"),
+    (r"(?:sách\s+)?(?:đánh\s*giá\s+cao|top\s+sao)",
+     "top_rated_books"),
 
     # Add to cart (must be before view_book)
     (r"(?:add|put)\s+(?:book\s*)?#?(\d+)\s+(?:to\s+)?(?:my\s+)?cart(?:\s+(?:qty|quantity|x)\s*(\d+))?",
@@ -383,6 +469,8 @@ HELP_TEXT = """🤖 **BookStore AI Agent** — I can help you with:
 📋 **View orders**: "view my orders" / "xem đơn hàng"
 ⭐ **Rate a book**: "rate book #2 5 stars Great!" / "đánh giá sách #2 5 sao"
 💬 **Book reviews**: "reviews for book #1" / "đánh giá sách #1"
+📦 **Check stock**: "stock book #2" / "tồn kho sách #2"
+🏆 **Top rated books**: "top rated books" / "sách đánh giá cao"
 🎯 **Recommendations**: "recommend" / "gợi ý sách"
 ❓ **Help**: "help" / "giúp"
 
@@ -483,6 +571,15 @@ class BookStoreAgent:
             if not book_id:
                 return {"success": False, "message": "Please specify a book ID. Example: 'reviews for book #1'"}
             return tool_get_reviews(book_id)
+
+        elif intent == "check_book_stock":
+            book_id = int(params[0]) if params[0] else None
+            if not book_id:
+                return {"success": False, "message": "Please specify a book ID. Example: 'stock book #2'"}
+            return tool_check_book_stock(book_id)
+
+        elif intent == "top_rated_books":
+            return tool_top_rated_books()
 
         elif intent == "get_recommendations":
             return tool_get_recommendations(self.customer_id)

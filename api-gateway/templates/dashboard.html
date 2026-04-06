@@ -104,6 +104,16 @@
         <a href="/admin-panel/categories/" class="btn btn-outline">🏷️ Categories</a>
     </div>
 </div>
+
+<div class="modal-overlay" id="bookDetailModal">
+    <div class="modal" style="max-width:760px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3>📖 Chi tiết sách</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeBookDetail()">Đóng</button>
+        </div>
+        <div id="bookDetailBody">Loading...</div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -138,7 +148,7 @@ async function loadDashboard() {
             tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">📖</div><p>No books yet. Add your first book!</p></div></td></tr>';
         } else {
             tbody.innerHTML = books.slice(0, 5).map(b => `
-                <tr>
+                <tr style="cursor:pointer" onclick="openBookDetail(${b.id})">
                     <td>${b.title}</td>
                     <td>${b.author}</td>
                     <td><span class="tag tag-green">$${b.price}</span></td>
@@ -168,6 +178,35 @@ async function loadDashboard() {
             `).join('');
         }
     } catch (e) { document.getElementById('recentCustomers').innerHTML = '<tr><td colspan="4" style="color:#e94560;">Failed to load</td></tr>'; }
+}
+
+async function openBookDetail(bookId) {
+    const modal = document.getElementById('bookDetailModal');
+    const body = document.getElementById('bookDetailBody');
+    modal.classList.add('show');
+    body.innerHTML = 'Loading...';
+    try {
+        const res = await fetch(`/api/proxy/books/${bookId}/`);
+        const b = await res.json();
+        body.innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+                <div><strong>Tiêu đề:</strong> ${b.title || '—'}</div>
+                <div><strong>Tác giả:</strong> ${b.author || '—'}</div>
+                <div><strong>Giá:</strong> ${b.price || '—'}</div>
+                <div><strong>Tồn kho:</strong> ${b.stock ?? '—'}</div>
+                <div><strong>Danh mục:</strong> ${b.category_name || '—'}</div>
+                <div><strong>NXB:</strong> ${b.publisher_name || '—'}</div>
+            </div>
+            <div><strong>ISBN:</strong> ${b.isbn || '—'}</div>
+            <div style="margin-top:10px"><strong>Mô tả:</strong><div style="margin-top:4px;color:var(--text-secondary)">${b.description || 'Chưa có mô tả'}</div></div>
+        `;
+    } catch (e) {
+        body.innerHTML = `<div style="color:#e94560">Không tải được chi tiết sách: ${e.message}</div>`;
+    }
+}
+
+function closeBookDetail() {
+    document.getElementById('bookDetailModal').classList.remove('show');
 }
 
 loadDashboard();

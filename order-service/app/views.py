@@ -16,6 +16,7 @@ except Exception:
 PAY_SERVICE_URL = "http://pay-service:8000"
 SHIP_SERVICE_URL = "http://ship-service:8000"
 CART_SERVICE_URL = "http://cart-service:8000"
+BOOK_SERVICE_URL = "http://book-service:8000"
 EVENT_BUS_URL = os.getenv("EVENT_BUS_URL", "")
 RABBITMQ_ENABLED = os.getenv("RABBITMQ_ENABLED", "false").lower() == "true"
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
@@ -47,6 +48,31 @@ def _resolve_item_price(cart_item):
     except Exception:
         pass
     return Decimal("0")
+
+
+def _normalize_payment_method(method):
+    raw = (method or "").strip().lower()
+    mapping = {
+        "cod": "cod",
+        "cash_on_delivery": "cod",
+        "chuyen_khoan": "bank_transfer",
+        "chuyen khoan": "bank_transfer",
+        "bank_transfer": "bank_transfer",
+        "credit_card": "credit_card",
+        "debit_card": "debit_card",
+        "paypal": "paypal",
+    }
+    return mapping.get(raw, "credit_card")
+
+
+def _get_book(book_id):
+    try:
+        r = requests.get(f"{BOOK_SERVICE_URL}/books/{book_id}/", timeout=5)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
 
 
 def _publish_event(topic, payload):
@@ -90,7 +116,7 @@ class OrderListCreate(APIView):
         if not customer_id:
             return Response({"error": "customer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        payment_method = request.data.get('payment_method', 'credit_card')
+        payment_method = _normalize_payment_method(request.data.get('payment_method', 'credit_card'))
         shipping_method = request.data.get('shipping_method', 'standard')
         simulate_payment_failure = bool(request.data.get('simulate_payment_failure', False))
         simulate_shipping_failure = bool(request.data.get('simulate_shipping_failure', False))
@@ -104,6 +130,44 @@ class OrderListCreate(APIView):
 
         if not cart_items:
             return Response({"error": "Cart is empty or unavailable"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate current stock before creating order.
+        insufficient_items = []
+        for item in cart_items:
+            book_id = item.get('book_id')
+            quantity = int(item.get('quantity', 1) or 1)
+            book = _get_book(book_id)
+            if not book:
+                insufficient_items.append({
+                    "book_id": book_id,
+                    "requested": quantity,
+                    "available": 0,
+                    "title": f"Book #{book_id}",
+                    "reason": "Book not found or unavailable",
+                })
+                continue
+
+            available = int(book.get('stock') or 0)
+            if quantity > available:
+                insufficient_items.append({
+                    "book_id": book_id,
+                    "requested": quantity,
+                    "available": available,
+                    "title": book.get('title') or f"Book #{book_id}",
+                    "reason": "Insufficient stock",
+                })
+
+        if insufficient_items:
+            detail_text = "; ".join(
+                [f"{it['title']}: requested {it['requested']}, available {it['available']}" for it in insufficient_items]
+            )
+            return Response(
+                {
+                    "error": f"Some products do not have enough stock ({detail_text})",
+                    "insufficient_items": insufficient_items,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         # Step 1: Create order (pending)
         order = Order.objects.create(
@@ -191,6 +255,36 @@ class OrderListCreate(APIView):
         order.status = 'confirmed'
         order.save(update_fields=['status'])
         _publish_event("order.confirmed", {"order_id": order.id})
+
+        # Step 5: Reduce stock after successful confirmation.
+        stock_update_errors = []
+        for item in cart_items:
+            book_id = item.get('book_id')
+            quantity = int(item.get('quantity', 1) or 1)
+            book = _get_book(book_id)
+            if not book:
+                stock_update_errors.append({"book_id": book_id, "reason": "Book not found when updating stock"})
+                continue
+
+            current_stock = int(book.get('stock') or 0)
+            new_stock = max(0, current_stock - quantity)
+            try:
+                requests.patch(
+                    f"{BOOK_SERVICE_URL}/books/{book_id}/",
+                    json={"stock": new_stock},
+                    timeout=8,
+                )
+            except Exception as e:
+                stock_update_errors.append({"book_id": book_id, "reason": str(e)})
+
+        if stock_update_errors:
+            _publish_event("stock.update.partial_failed", {"order_id": order.id, "errors": stock_update_errors})
+
+        # Step 6: Clear cart after successful order placement.
+        try:
+            requests.delete(f"{CART_SERVICE_URL}/carts/{customer_id}/", timeout=8)
+        except Exception:
+            pass
 
         serializer = OrderSerializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

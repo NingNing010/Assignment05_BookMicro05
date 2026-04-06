@@ -821,6 +821,7 @@
             <div class="nav-links">
                 <a href="/store/" class="nav-link {% block nav_home %}{% endblock %}"><span class="icon">🏠</span> Trang chủ</a>
                 <a href="/store/books/" class="nav-link {% block nav_books %}{% endblock %}"><span class="icon">📚</span> Sách</a>
+                <a href="/store/reviews/" class="nav-link {% block nav_reviews %}{% endblock %}"><span class="icon">⭐</span> Đánh giá</a>
             </div>
         </div>
         <div class="nav-right" id="navRight">
@@ -846,6 +847,8 @@
         </div>
         <div class="chatbot-quick">
             <button onclick="sendQuickChat('help')">help</button>
+            <button onclick="sendQuickChat('stock book #1')">tồn kho</button>
+            <button onclick="sendQuickChat('top rated books')">top sao</button>
             <button onclick="sendQuickChat('xem giỏ hàng')">xem giỏ</button>
             <button onclick="sendQuickChat('xem đơn hàng')">xem đơn</button>
             <button onclick="sendQuickChat('gợi ý sách')">gợi ý</button>
@@ -872,6 +875,8 @@
         <div class="footer-right">
             <span id="footerUser"></span>
             <a href="/store/orders/" class="footer-link">📦 Đơn hàng</a>
+            <a href="/store/reviews/" class="footer-link">⭐ Đánh giá</a>
+            <a href="/store/ai-advisor/" class="footer-link">🧠 AI Tư vấn</a>
             <a href="/store/cart/" class="footer-link">🛒 Giỏ hàng</a>
             <a href="/admin-panel/" class="footer-link" title="Quản trị">⚙️</a>
         </div>
@@ -921,6 +926,11 @@
             const token = getAccessToken();
             const nav = document.getElementById('navRight');
             const footer = document.getElementById('footerUser');
+            const pathname = window.location.pathname || '';
+            const reviewsActive = pathname.startsWith('/store/reviews/') ? 'active' : '';
+            const ordersActive = pathname.startsWith('/store/orders/') ? 'active' : '';
+            const cartActive = pathname.startsWith('/store/cart/') ? 'active' : '';
+            const aiAdvisorActive = pathname.startsWith('/store/ai-advisor/') ? 'active' : '';
 
             // Normalize stale session: customer profile exists but no JWT token.
             if (c && !token) {
@@ -930,8 +940,10 @@
 
             if (c && token) {
                 nav.innerHTML = `
-                    <a href="/store/orders/" class="nav-link {% block nav_orders %}{% endblock %}"><span class="icon">📦</span> Đơn hàng</a>
-                    <a href="/store/cart/" class="nav-cart-btn {% block nav_cart %}{% endblock %}">🛒 Giỏ hàng <span class="cart-badge" id="cartCount" style="display:none">0</span></a>
+                    <a href="/store/reviews/" class="nav-link ${reviewsActive}"><span class="icon">⭐</span> Đánh giá</a>
+                    <a href="/store/orders/" class="nav-link ${ordersActive}"><span class="icon">📦</span> Đơn hàng</a>
+                    <a href="/store/ai-advisor/" class="nav-link ${aiAdvisorActive}"><span class="icon">🧠</span> AI Tư vấn</a>
+                    <a href="/store/cart/" class="nav-cart-btn ${cartActive}">🛒 Giỏ hàng <span class="cart-badge" id="cartCount" style="display:none">0</span></a>
                     <span class="nav-user">👤 ${c.full_name || c.name}</span>
                     <button class="btn-logout" onclick="logout()" title="Đăng xuất">↪️</button>
                 `;
@@ -1115,6 +1127,28 @@
                         <div class="chat-rich-item">
                             <div class="title">Đơn #${escapeHtml(o.id)} - ${escapeHtml(o.status || 'pending')}</div>
                             <div class="meta">Tổng: ${escapeHtml(o.total_amount ?? 0)} đ</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else if (Array.isArray(extra.items) && extra.items.length) {
+                html += '<div class="chat-rich-list">';
+                extra.items.slice(0, 8).forEach((it) => {
+                    html += `
+                        <div class="chat-rich-item">
+                            <div class="title">Book #${escapeHtml(it.book_id)} x ${escapeHtml(it.quantity)}</div>
+                            <div class="meta">Cart item #${escapeHtml(it.id)}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else if (Array.isArray(extra.top_books) && extra.top_books.length) {
+                html += '<div class="chat-rich-list">';
+                extra.top_books.forEach((b, idx) => {
+                    html += `
+                        <div class="chat-rich-item">
+                            <div class="title">${idx + 1}. ${escapeHtml(b.title || ('Book #' + b.book_id))}</div>
+                            <div class="meta">⭐ ${escapeHtml(b.avg_rating)} (${escapeHtml(b.review_count)} reviews) | Stock: ${escapeHtml(b.stock ?? '-')}</div>
                         </div>
                     `;
                 });

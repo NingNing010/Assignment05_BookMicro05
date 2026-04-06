@@ -12,6 +12,8 @@ urlpatterns = [
     path('store/book/<int:book_id>/', views.store_book_detail, name='store_book_detail'),
     path('store/cart/', views.store_cart, name='store_cart'),
     path('store/orders/', views.store_orders, name='store_orders'),
+    path('store/reviews/', views.store_reviews, name='store_reviews'),
+    path('store/ai-advisor/', views.store_ai_advisor, name='store_ai_advisor'),
     path('store/login/', views.store_login, name='store_login'),
     path('store/register/', views.store_register, name='store_register'),
 

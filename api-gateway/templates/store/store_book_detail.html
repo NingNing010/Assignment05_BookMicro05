@@ -339,7 +339,8 @@
 
     function changeQty(delta) {
         const inp = document.getElementById('qtyInput');
-        const v = Math.max(1, parseInt(inp.value || 1) + delta);
+        const max = parseInt(inp.max || '999', 10);
+        const v = Math.max(1, Math.min(max, parseInt(inp.value || 1) + delta));
         inp.value = v;
     }
 
@@ -354,7 +355,13 @@
         const c = getCustomer();
         if (!c) { window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname); return; }
 
-        const qty = parseInt(document.getElementById('qtyInput').value) || 1;
+        const qtyInput = document.getElementById('qtyInput');
+        const qty = parseInt(qtyInput.value) || 1;
+        const max = parseInt(qtyInput.max || '999', 10);
+        if (qty > max) {
+            showToast(`Chỉ còn ${max} cuốn trong kho`, 'error');
+            return;
+        }
         try {
             await apiCall('/api/proxy/cart-items/', 'POST', {
                 customer_id: c.id,

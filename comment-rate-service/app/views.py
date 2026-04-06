@@ -4,8 +4,14 @@ from rest_framework import status
 from .models import Review
 from .serializers import ReviewSerializer
 import requests
+from .model_behavior import BehaviorModelService
+from .knowledge_base import KnowledgeBaseManager
+from .rag_advisor import BehaviorRAGAdvisor
 
 BOOK_SERVICE_URL = "http://book-service:8000"
+behavior_service = BehaviorModelService()
+kb_manager = KnowledgeBaseManager()
+rag_advisor = BehaviorRAGAdvisor()
 
 
 class ReviewListCreate(APIView):
@@ -84,3 +90,79 @@ class BookReviews(APIView):
         reviews = Review.objects.filter(book_id=book_id)
         serializer = ReviewSerializer(reviews, many=True)
         return Response(serializer.data)
+
+
+class BehaviorModelTrain(APIView):
+    """Train deep learning model_behavior from review data."""
+
+    def post(self, request):
+        epochs = int(request.data.get("epochs", 120))
+        learning_rate = float(request.data.get("learning_rate", 0.01))
+        reviews = Review.objects.all()
+        try:
+            result = behavior_service.train(reviews, epochs=epochs, lr=learning_rate)
+            code = status.HTTP_200_OK if result.get("trained") else status.HTTP_400_BAD_REQUEST
+            return Response(result, status=code)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class BehaviorCustomerAnalyze(APIView):
+    """Predict customer behavior segment and service advice."""
+
+    def get(self, request, customer_id):
+        reviews = Review.objects.all()
+        try:
+            result = behavior_service.predict_customer(customer_id=customer_id, reviews=reviews)
+            code = status.HTTP_200_OK if result.get("found") else status.HTTP_404_NOT_FOUND
+            return Response(result, status=code)
+        except FileNotFoundError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class KnowledgeBaseList(APIView):
+    """List current KB documents used by RAG advisor."""
+
+    def get(self, request):
+        docs = kb_manager.load_documents()
+        return Response({"count": len(docs), "documents": docs}, status=status.HTTP_200_OK)
+
+
+class KnowledgeBaseRebuild(APIView):
+    """Rebuild KB with optional custom docs from request body."""
+
+    def post(self, request):
+        extra_docs = request.data.get("documents", [])
+        if extra_docs is None:
+            extra_docs = []
+        if not isinstance(extra_docs, list):
+            return Response(
+                {"error": "documents phai la list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            result = kb_manager.rebuild(extra_docs=extra_docs)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RAGBehaviorChat(APIView):
+    """RAG chat for customer behavior advisory."""
+
+    def post(self, request):
+        question = (request.data.get("question") or "").strip()
+        customer_id = request.data.get("customer_id")
+        if customer_id is not None:
+            try:
+                customer_id = int(customer_id)
+            except Exception:
+                return Response({"error": "customer_id khong hop le"}, status=status.HTTP_400_BAD_REQUEST)
+
+        reviews = Review.objects.all()
+        result = rag_advisor.ask(question=question, reviews=reviews, customer_id=customer_id)
+        if result.get("error"):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=status.HTTP_200_OK)

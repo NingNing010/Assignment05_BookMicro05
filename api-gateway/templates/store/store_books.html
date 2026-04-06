@@ -40,6 +40,35 @@
         outline: none;
         background: var(--bg-white);
     }
+
+    .book-popup-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(14, 18, 29, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 16px;
+    }
+
+    .book-popup-overlay.show { display: flex; }
+
+    .book-popup {
+        width: min(760px, 100%);
+        max-height: 90vh;
+        overflow: auto;
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 22px;
+    }
+
+    .btn-add-cart[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
 </style>
 {% endblock %}
 
@@ -66,6 +95,10 @@
         <div class="spinner"></div>
     </div>
 </section>
+
+<div class="book-popup-overlay" id="bookPopup" onclick="if(event.target===this)closeBookPopup()">
+    <div class="book-popup" id="bookPopupContent"></div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -135,7 +168,7 @@
             const stockClass = b.stock > 5 ? 'in-stock' : b.stock > 0 ? 'low-stock' : 'out-of-stock';
             const stockText = b.stock > 5 ? 'Còn hàng' : b.stock > 0 ? `Còn ${b.stock}` : 'Hết hàng';
             return `
-                <div class="book-card" onclick="window.location='/store/book/${b.id}/'">
+                <div class="book-card" onclick="openBookPopup(${b.id})">
                     <div class="book-card-cover ${gradClass(i)}">
                         <div class="book-icon">📖</div>
                         ${b.category_name ? `<span class="category-tag">${b.category_name}</span>` : ''}
@@ -146,16 +179,58 @@
                         <div class="book-card-author">✍️ ${b.author}</div>
                         <div class="book-card-footer">
                             <div class="book-card-price">${formatPrice(b.price)} <span class="currency">₫</span></div>
-                            <button class="btn-add-cart" onclick="event.stopPropagation();addToCart(${b.id})">🛒 Thêm</button>
+                            <button class="btn-add-cart" ${b.stock < 1 ? 'disabled' : ''} onclick="event.stopPropagation();addToCart(${b.id})">${b.stock < 1 ? 'Hết hàng' : '🛒 Thêm'}</button>
                         </div>
                     </div>
                 </div>`;
         }).join('');
     }
 
+    async function openBookPopup(bookId) {
+        const popup = document.getElementById('bookPopup');
+        const content = document.getElementById('bookPopupContent');
+        popup.classList.add('show');
+        content.innerHTML = '<div class="spinner"></div>';
+        try {
+            const book = await apiCall(`/api/proxy/books/${bookId}/`);
+            const out = (book.stock || 0) < 1;
+            content.innerHTML = `
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px">
+                    <div>
+                        <h3 style="font-size:1.25rem">${book.title}</h3>
+                        <div style="color:var(--text-muted);margin-top:4px">✍️ ${book.author}</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm" onclick="closeBookPopup()">Đóng</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+                    <div class="meta-item"><div class="meta-label">Giá</div><div class="meta-value">${formatPrice(book.price)} ₫</div></div>
+                    <div class="meta-item"><div class="meta-label">Tồn kho</div><div class="meta-value">${book.stock}</div></div>
+                    <div class="meta-item"><div class="meta-label">Danh mục</div><div class="meta-value">${book.category_name || '—'}</div></div>
+                    <div class="meta-item"><div class="meta-label">NXB</div><div class="meta-value">${book.publisher_name || '—'}</div></div>
+                </div>
+                <div style="font-size:0.9rem;color:var(--text-body);line-height:1.7">${book.description || 'Chưa có mô tả.'}</div>
+                <div style="display:flex;gap:10px;margin-top:16px">
+                    <button class="btn btn-primary" ${out ? 'disabled' : ''} onclick="addToCart(${book.id})">${out ? 'Hết hàng' : '🛒 Thêm vào giỏ'}</button>
+                    <a class="btn btn-outline" href="/store/book/${book.id}/">Xem trang chi tiết</a>
+                </div>
+            `;
+        } catch (e) {
+            content.innerHTML = `<div style="color:#c0392b">Không thể tải chi tiết sách: ${e.message}</div>`;
+        }
+    }
+
+    function closeBookPopup() {
+        document.getElementById('bookPopup').classList.remove('show');
+    }
+
     async function addToCart(bookId) {
         const c = getCustomer();
         if (!c) { window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname); return; }
+        const book = (allBooks || []).find(b => Number(b.id) === Number(bookId));
+        if (book && Number(book.stock || 0) < 1) {
+            showToast('Sách đã hết hàng, không thể thêm vào giỏ', 'error');
+            return;
+        }
         try {
             await apiCall('/api/proxy/cart-items/', 'POST', { customer_id: c.id, book_id: bookId, quantity: 1 });
             showToast('Đã thêm vào giỏ hàng! 🛒');

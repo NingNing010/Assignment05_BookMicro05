@@ -21,3 +21,19 @@ class BookSerializer(serializers.ModelSerializer):
     class Meta:
         model = Book
         fields = '__all__'
+
+    def validate_stock(self, value):
+        if value is None:
+            return value
+        if not isinstance(value, int):
+            raise serializers.ValidationError("Stock must be an integer")
+        if value < 0:
+            raise serializers.ValidationError("Stock must be >= 0")
+        return value
+
+    def validate_price(self, value):
+        if value is None:
+            return value
+        if value <= 0:
+            raise serializers.ValidationError("Price must be > 0")
+        return value

@@ -12,7 +12,12 @@ INSERT INTO app_category (id, name, description) VALUES
   (1, 'Programming', 'Software development and coding books'),
   (2, 'Data Science', 'Machine learning, AI and analytics'),
   (3, 'Architecture', 'Software architecture and system design'),
-  (4, 'DevOps', 'Deployment, CI/CD, cloud and operations')
+  (4, 'DevOps', 'Deployment, CI/CD, cloud and operations'),
+  (5, 'Cooking', 'Cooking, recipes and culinary skills'),
+  (6, 'Lifestyle', 'Self-help, habits and healthy living'),
+  (7, 'Household', 'Home organization and useful household guides'),
+  (8, 'Business', 'Business, sales, marketing and finance'),
+  (9, 'Children', 'Books for kids and parenting')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description);
@@ -20,7 +25,9 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO app_publisher (id, name, address, email) VALUES
   (1, 'TechBooks VN', 'Ho Chi Minh City', 'contact@techbooksvn.com'),
   (2, 'Global Code Press', 'Singapore', 'hello@globalcodepress.io'),
-  (3, 'Cloud Native House', 'Ha Noi', 'support@cloudnativehouse.vn')
+  (3, 'Cloud Native House', 'Ha Noi', 'support@cloudnativehouse.vn'),
+  (4, 'LifeStyle Press', 'Da Nang', 'hello@lifestylepress.vn'),
+  (5, 'Family & Home Books', 'Can Tho', 'support@familyhomebooks.vn')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   address = VALUES(address),
@@ -32,7 +39,17 @@ INSERT INTO app_book (id, title, author, price, stock, description, isbn, catego
   (3, 'Microservices Patterns', 'Chris Richardson', 410000.00, 25, 'Patterns for decomposition and data consistency', '9781617294549', 3, 2),
   (4, 'Python Crash Course', 'Eric Matthes', 280000.00, 60, 'Practical introduction to Python', '9781593279288', 1, 1),
   (5, 'Hands-On Machine Learning', 'Aurelien Geron', 520000.00, 20, 'ML with Scikit-Learn, Keras and TensorFlow', '9781492032649', 2, 2),
-  (6, 'The DevOps Handbook', 'Gene Kim', 390000.00, 35, 'How to create world-class agility and reliability', '9781942788003', 4, 3)
+  (6, 'The DevOps Handbook', 'Gene Kim', 390000.00, 35, 'How to create world-class agility and reliability', '9781942788003', 4, 3),
+  (12, 'Nau An Viet Nam De Dang', 'Chef Minh Anh', 240000.00, 40, 'Cong thuc mon Viet don gian cho nguoi moi bat dau', '9786041234501', 5, 4),
+  (13, 'Healthy Meal Prep', 'Luna Nguyen', 260000.00, 28, 'Huong dan meal prep va thuc don can bang cho ca tuan', '9786041234502', 5, 4),
+  (14, 'Song Toi Gian Hieu Qua', 'Tran Hoang', 210000.00, 33, 'Toi gian hoa doi song va cai thien chat luong song', '9786041234503', 6, 4),
+  (15, 'Atomic Habits Thuc Hanh', 'James Clear VN', 295000.00, 22, 'Xay dung thoi quen tot va pha vo thoi quen xau', '9786041234504', 6, 4),
+  (16, 'Nha Cua Gon Gang Moi Ngay', 'Ngoc Ha', 185000.00, 30, 'Giai phap sap xep, don dep va quan ly vat dung trong nha', '9786041234505', 7, 5),
+  (17, 'Do Gia Dung Thong Minh', 'Khanh Ly', 230000.00, 18, 'Cam nang chon va su dung vat dung gia dung hieu qua', '9786041234506', 7, 5),
+  (18, 'Khoi Nghiep Tinh Gon', 'Pham Quang', 320000.00, 20, 'Tu y tuong den mo hinh kinh doanh cho startup nho', '9786041234507', 8, 4),
+  (19, 'Marketing 0 Dong', 'Le Nhat Linh', 275000.00, 26, 'Chien luoc marketing chi phi thap cho doanh nghiep nho', '9786041234508', 8, 4),
+  (20, 'Truyen Ke Be Ngu', 'Bao An', 165000.00, 45, 'Tuyen tap truyen ngan cho tre em truoc gio di ngu', '9786041234509', 9, 5),
+  (21, 'Nuoi Day Con Tu Som', 'Thu Ha', 250000.00, 24, 'Kien thuc nen tang ve giao duc som cho tre nho', '9786041234510', 9, 5)
 ON DUPLICATE KEY UPDATE
   title = VALUES(title),
   author = VALUES(author),
@@ -50,7 +67,12 @@ INSERT INTO app_category (id, name, description) VALUES
   (1, 'Programming', 'Software development and coding books'),
   (2, 'Data Science', 'Machine learning, AI and analytics'),
   (3, 'Architecture', 'Software architecture and system design'),
-  (4, 'DevOps', 'Deployment, CI/CD, cloud and operations')
+  (4, 'DevOps', 'Deployment, CI/CD, cloud and operations'),
+  (5, 'Cooking', 'Cooking, recipes and culinary skills'),
+  (6, 'Lifestyle', 'Self-help, habits and healthy living'),
+  (7, 'Household', 'Home organization and useful household guides'),
+  (8, 'Business', 'Business, sales, marketing and finance'),
+  (9, 'Children', 'Books for kids and parenting')
 ON DUPLICATE KEY UPDATE
   name = VALUES(name),
   description = VALUES(description);
@@ -121,7 +143,34 @@ ON DUPLICATE KEY UPDATE
   stock = VALUES(stock),
   description = VALUES(description);
 
--- 7) Quick checks
+-- 7) STAFF SERVICE DATA
+USE bookstore_staff;
+
+INSERT INTO app_staff (id, name, email, role) VALUES
+  (1, 'Nguyen Van Staff', 'staff01@bookstore.vn', 'sales_staff'),
+  (2, 'Tran Thi Support', 'staff02@bookstore.vn', 'support_staff'),
+  (3, 'Le Quoc Kho', 'staff03@bookstore.vn', 'warehouse_staff'),
+  (4, 'Pham Thu CSKH', 'staff04@bookstore.vn', 'customer_service')
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  email = VALUES(email),
+  role = VALUES(role);
+
+-- 8) MANAGER SERVICE DATA
+USE bookstore_manager;
+
+INSERT INTO app_manager (id, name, email, department) VALUES
+  (1, 'Nguyen Minh Quan', 'manager01@bookstore.vn', 'operations'),
+  (2, 'Tran Bao Chau', 'manager02@bookstore.vn', 'sales'),
+  (3, 'Le Hoang Nam', 'manager03@bookstore.vn', 'customer_success')
+ON DUPLICATE KEY UPDATE
+  name = VALUES(name),
+  email = VALUES(email),
+  department = VALUES(department);
+
+-- 9) Quick checks
 SELECT COUNT(*) AS books_count FROM bookstore_book.app_book;
 SELECT COUNT(*) AS customers_count FROM bookstore_customer.app_customer;
 SELECT COUNT(*) AS clothes_count FROM bookstore_clothes.app_clothes;
+SELECT COUNT(*) AS staff_count FROM bookstore_staff.app_staff;
+SELECT COUNT(*) AS manager_count FROM bookstore_manager.app_manager;

@@ -130,6 +130,19 @@
         gap: 10px;
     }
 
+    .checkout-method {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--border);
+    }
+
+    .checkout-method label {
+        display: block;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
+
     @media (max-width: 768px) {
         .cart-layout { grid-template-columns: 1fr; padding: 20px; }
     }
@@ -251,6 +264,13 @@
                     <span>Tổng cộng</span>
                     <span class="total-price">${formatPrice(total)} ₫</span>
                 </div>
+                <div class="checkout-method">
+                    <label>Phương thức thanh toán</label>
+                    <select class="form-control" id="paymentMethod">
+                        <option value="cod">COD (Thanh toán khi nhận hàng)</option>
+                        <option value="bank_transfer">Chuyển khoản</option>
+                    </select>
+                </div>
                 <div class="checkout-actions">
                     <button class="btn btn-primary btn-block btn-lg" onclick="placeOrder()">📦 Đặt hàng</button>
                     <a href="/store/" class="btn btn-outline btn-block">← Tiếp tục mua sắm</a>
@@ -297,11 +317,19 @@
     async function placeOrder() {
         if (!requireLogin()) return;
         const c = getCustomer();
+        const paymentMethod = document.getElementById('paymentMethod')?.value || 'cod';
         try {
-            await apiCall('/api/proxy/orders/', 'POST', { customer_id: c.id });
+            await apiCall('/api/proxy/orders/', 'POST', {
+                customer_id: c.id,
+                payment_method: paymentMethod,
+            });
             showToast('🎉 Đặt hàng thành công!');
             setTimeout(() => window.location.href = '/store/orders/', 1500);
         } catch(e) {
+            if (String(e.message || '').includes('Some products do not have enough stock')) {
+                showToast('Có sản phẩm không đủ tồn kho. Hãy giảm số lượng hoặc xóa sản phẩm hết hàng.', 'error');
+                return;
+            }
             showToast('Lỗi: ' + e.message, 'error');
         }
     }

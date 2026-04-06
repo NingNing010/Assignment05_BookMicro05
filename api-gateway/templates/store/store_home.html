@@ -344,7 +344,7 @@
                         <div class="book-card-author">✍️ ${b.author}</div>
                         <div class="book-card-footer">
                             <div class="book-card-price">${formatPrice(b.price)} <span class="currency">₫</span></div>
-                            <button class="btn-add-cart" onclick="event.stopPropagation();addToCart(${b.id})">🛒 Thêm</button>
+                            <button class="btn-add-cart" ${b.stock < 1 ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''} onclick="event.stopPropagation();addToCart(${b.id})">${b.stock < 1 ? 'Hết hàng' : '🛒 Thêm'}</button>
                         </div>
                     </div>
                 </div>
@@ -374,6 +374,12 @@
         const c = getCustomer();
         if (!c) {
             window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
+            return;
+        }
+
+        const book = (allBooks || []).find(b => Number(b.id) === Number(bookId));
+        if (book && Number(book.stock || 0) < 1) {
+            showToast('Sách đã hết hàng, không thể thêm vào giỏ', 'error');
             return;
         }
 

@@ -11,6 +11,7 @@ class Payment(models.Model):
         ('refunded', 'Refunded'),
     ]
     METHOD_CHOICES = [
+        ('cod', 'Cash On Delivery'),
         ('credit_card', 'Credit Card'),
         ('debit_card', 'Debit Card'),
         ('paypal', 'PayPal'),

@@ -5,13 +5,20 @@
 {% block extra_css %}
 <style>
     .cart-layout {
-        max-width: 1280px;
+        width: 100%;
+        max-width: 1180px;
         margin: 0 auto;
-        padding: 40px;
+        padding: 0 24px 40px;
         display: grid;
-        grid-template-columns: 1fr 360px;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
         gap: 32px;
         align-items: start;
+        justify-content: center;
+    }
+
+    .cart-layout > .card,
+    .cart-summary {
+        min-width: 0;
     }
 
     .cart-item {
@@ -136,6 +143,12 @@
         border-top: 1px dashed var(--border);
     }
 
+    .receiver-info {
+        margin-top: 14px;
+        display: grid;
+        gap: 10px;
+    }
+
     .checkout-method label {
         display: block;
         font-size: 0.82rem;
@@ -144,7 +157,10 @@
     }
 
     @media (max-width: 768px) {
-        .cart-layout { grid-template-columns: 1fr; padding: 20px; }
+        .cart-layout {
+            grid-template-columns: 1fr;
+            padding: 0 16px 24px;
+        }
     }
 </style>
 {% endblock %}
@@ -167,27 +183,31 @@
 {% block scripts %}
 <script>
     let cartItems = [];
-    let booksMap = {};
+    let cartProducts = {};
+    let cartTotal = 0;
 
     async function loadCart() {
         if (!requireLogin()) return;
         const c = getCustomer();
 
         try {
-            const [cartRes, booksRes] = await Promise.all([
-                fetch(`/api/proxy/carts/${c.id}/`),
-                fetch('/api/proxy/books/')
-            ]);
+            const cartRes = await fetch(`/api/proxy/carts/${c.id}/`);
 
             const cartData = await cartRes.json();
-            const books = await booksRes.json();
-
-            // Build books map
-            (Array.isArray(books) ? books : []).forEach(b => booksMap[b.id] = b);
 
             // cartData might be {items: [...]} or directly an array
             cartItems = cartData.items || cartData || [];
             if (!Array.isArray(cartItems)) cartItems = [];
+
+            const resolvedProducts = await Promise.all(
+                cartItems.map(async item => fetchStoreProductById(item.book_id))
+            );
+            cartProducts = {};
+            resolvedProducts.forEach((product, index) => {
+                if (product) {
+                    cartProducts[cartItems[index].id] = product;
+                }
+            });
 
             renderCart();
         } catch(e) {
@@ -204,32 +224,38 @@
     function renderCart() {
         const layout = document.getElementById('cartLayout');
         document.getElementById('cartSubtitle').textContent = `${cartItems.length} sản phẩm`;
+        cartTotal = 0;
 
         if (cartItems.length === 0) {
             layout.innerHTML = `
                 <div class="empty-state" style="grid-column:1/-1">
                     <div class="empty-icon">🛒</div>
                     <div class="empty-title">Giỏ hàng trống</div>
-                    <div class="empty-desc">Hãy thêm sách vào giỏ hàng của bạn!</div>
-                    <a href="/store/" class="btn btn-primary">📚 Xem sách ngay</a>
+                    <div class="empty-desc">Hãy thêm sản phẩm vào giỏ hàng của bạn!</div>
+                    <a href="/store/" class="btn btn-primary">📚 Xem ngay</a>
                 </div>
             `;
             return;
         }
 
-        let total = 0;
         const itemsHtml = cartItems.map((item, i) => {
-            const book = booksMap[item.book_id] || {};
-            const price = parseFloat(book.price || 0);
+            const product = cartProducts[item.id] || {};
+            const price = parseFloat(product.price || 0);
             const subtotal = price * (item.quantity || 1);
-            total += subtotal;
+            cartTotal += subtotal;
+            const isClothes = product._type === 'clothes';
+            const icon = isClothes ? '👕' : '📖';
+            const title = formatStoreProductTitle(product) || (isClothes ? `Quần áo #${item.book_id}` : `Sách #${item.book_id}`);
+            const subtitle = isClothes
+                ? `🏷️ ${product.brand || '—'} • ${product.size || '—'} • ${product.color || '—'}`
+                : `✍️ ${product.author || '—'}`;
 
             return `
                 <div class="cart-item">
-                    <div class="cart-item-cover ${gradClass(item.book_id || i)}">📖</div>
+                    <div class="cart-item-cover ${gradClass(item.book_id || i)}">${icon}</div>
                     <div class="cart-item-info">
-                        <div class="cart-item-title">${book.title || `Sách #${item.book_id}`}</div>
-                        <div class="cart-item-author">✍️ ${book.author || '—'}</div>
+                        <div class="cart-item-title">${title}</div>
+                        <div class="cart-item-author">${subtitle}</div>
                         <div class="cart-item-price">${formatPrice(subtotal)} ₫</div>
                     </div>
                     <div class="cart-item-qty">
@@ -254,7 +280,7 @@
                 </div>
                 <div class="summary-row">
                     <span class="label">Tạm tính</span>
-                    <span class="value">${formatPrice(total)} ₫</span>
+                    <span class="value">${formatPrice(cartTotal)} ₫</span>
                 </div>
                 <div class="summary-row">
                     <span class="label">Phí vận chuyển</span>
@@ -262,7 +288,7 @@
                 </div>
                 <div class="summary-total">
                     <span>Tổng cộng</span>
-                    <span class="total-price">${formatPrice(total)} ₫</span>
+                    <span class="total-price">${formatPrice(cartTotal)} ₫</span>
                 </div>
                 <div class="checkout-method">
                     <label>Phương thức thanh toán</label>
@@ -270,6 +296,11 @@
                         <option value="cod">COD (Thanh toán khi nhận hàng)</option>
                         <option value="bank_transfer">Chuyển khoản</option>
                     </select>
+                    <div class="receiver-info">
+                        <input class="form-control" id="receiverName" placeholder="Tên người nhận *">
+                        <input class="form-control" id="receiverPhone" placeholder="Số điện thoại *">
+                        <input class="form-control" id="shippingAddress" placeholder="Địa chỉ nhận hàng *">
+                    </div>
                 </div>
                 <div class="checkout-actions">
                     <button class="btn btn-primary btn-block btn-lg" onclick="placeOrder()">📦 Đặt hàng</button>
@@ -318,10 +349,34 @@
         if (!requireLogin()) return;
         const c = getCustomer();
         const paymentMethod = document.getElementById('paymentMethod')?.value || 'cod';
+        const receiverName = (document.getElementById('receiverName')?.value || '').trim();
+        const receiverPhone = (document.getElementById('receiverPhone')?.value || '').trim();
+        const shippingAddress = (document.getElementById('shippingAddress')?.value || '').trim();
+
+        if (!receiverName || !receiverPhone || !shippingAddress) {
+            showToast('Vui lòng nhập tên người nhận, số điện thoại và địa chỉ', 'error');
+            return;
+        }
+
+        if (paymentMethod === 'bank_transfer') {
+            localStorage.setItem('store_pending_transfer_order', JSON.stringify({
+                customer_id: c.id,
+                total_amount: cartTotal,
+                item_count: cartItems.length,
+                receiver_name: receiverName,
+                receiver_phone: receiverPhone,
+                shipping_address: shippingAddress,
+            }));
+            window.location.href = '/store/payment/confirm/';
+            return;
+        }
         try {
             await apiCall('/api/proxy/orders/', 'POST', {
                 customer_id: c.id,
                 payment_method: paymentMethod,
+                receiver_name: receiverName,
+                receiver_phone: receiverPhone,
+                shipping_address: shippingAddress,
             });
             showToast('🎉 Đặt hàng thành công!');
             setTimeout(() => window.location.href = '/store/orders/', 1500);

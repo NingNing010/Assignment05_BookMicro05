@@ -10,9 +10,12 @@ urlpatterns = [
     path('store/', views.store_home, name='store_home_alt'),
     path('store/books/', views.store_books, name='store_books'),
     path('store/book/<int:book_id>/', views.store_book_detail, name='store_book_detail'),
+    path('store/clothes/', views.store_clothes, name='store_clothes'),
+    path('store/clothes/<int:clothes_id>/', views.store_clothes_detail, name='store_clothes_detail'),
     path('store/cart/', views.store_cart, name='store_cart'),
     path('store/orders/', views.store_orders, name='store_orders'),
     path('store/reviews/', views.store_reviews, name='store_reviews'),
+    path('store/payment/confirm/', views.store_payment_confirm, name='store_payment_confirm'),
     path('store/ai-advisor/', views.store_ai_advisor, name='store_ai_advisor'),
     path('store/login/', views.store_login, name='store_login'),
     path('store/register/', views.store_register, name='store_register'),
@@ -20,6 +23,8 @@ urlpatterns = [
     # ── Admin Panel ──
     path('admin-panel/', views.dashboard, name='dashboard'),
     path('admin-panel/books/', views.book_list, name='book_list'),
+    path('admin-panel/clothes/', views.clothes_list, name='clothes_list'),
+    path('admin-panel/accounts/', views.account_list, name='account_list'),
     path('admin-panel/publishers/', views.publisher_list, name='publisher_list'),
     path('admin-panel/cart/<int:customer_id>/', views.view_cart, name='view_cart'),
     path('admin-panel/customers/', views.customer_list, name='customer_list'),
@@ -32,8 +37,6 @@ urlpatterns = [
     path('admin-panel/staff/', views.staff_list, name='staff_list'),
     path('admin-panel/managers/', views.manager_list, name='manager_list'),
 
-    # AI Agent (under admin panel)
-    path('admin-panel/agent/', views.agent_chat_page, name='agent_chat'),
     path('api/agent/chat/', views.agent_chat_api, name='agent_chat_api'),
     path('api/agent/help/', views.agent_help_api, name='agent_help_api'),
 

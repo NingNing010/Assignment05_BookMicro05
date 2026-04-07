@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Accounts{% endblock %}
+{% block nav_accounts %}active{% endblock %}
+{% block page_title %}🛡️ Accounts{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">➕ Tạo tài khoản quản trị</div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Email *</label>
+            <input class="form-control" id="fEmail" placeholder="admin@example.com">
+        </div>
+        <div class="form-group">
+            <label>Họ và tên *</label>
+            <input class="form-control" id="fFullName" placeholder="Nguyen Van Admin">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Mật khẩu *</label>
+            <input class="form-control" id="fPassword" type="password" placeholder="Tối thiểu 6 ký tự">
+        </div>
+        <div class="form-group">
+            <label>Vai trò *</label>
+            <select class="form-control" id="fRole">
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="staff">Staff</option>
+            </select>
+        </div>
+    </div>
+    <button class="btn btn-primary" onclick="createAccount()">Tạo tài khoản</button>
+</div>
+
+<div class="card">
+    <div class="card-title">👥 Danh sách tài khoản</div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Email</th>
+                    <th>Họ và tên</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Tạo lúc</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="6" style="text-align:center;color:#666;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadData() {
+    try {
+        const res = await fetch('/api/auth/users/');
+        const items = await res.json();
+        const tbody = document.getElementById('tableBody');
+        if (!Array.isArray(items) || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">🛡️</div><p>No accounts found.</p></div></td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(u => `
+            <tr>
+                <td>#${u.id}</td>
+                <td>${u.email}</td>
+                <td>${u.full_name || '—'}</td>
+                <td><span class="tag tag-blue">${u.role}</span></td>
+                <td><span class="tag ${u.is_active ? 'tag-green' : 'tag-red'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td>${u.created_at ? new Date(u.created_at).toLocaleString('vi-VN') : ''}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="color:#e94560;">Failed to load users</td></tr>';
+    }
+}
+
+async function createAccount() {
+    const email = document.getElementById('fEmail').value.trim();
+    const fullName = document.getElementById('fFullName').value.trim();
+    const password = document.getElementById('fPassword').value;
+    const role = document.getElementById('fRole').value;
+
+    if (!email || !fullName || !password) {
+        showToast('Vui lòng nhập đầy đủ thông tin', 'error');
+        return;
+    }
+    if (password.length < 6) {
+        showToast('Mật khẩu tối thiểu 6 ký tự', 'error');
+        return;
+    }
+
+    const r = await apiCall('/api/auth/register/', 'POST', {
+        email,
+        password,
+        full_name: fullName,
+        role,
+    });
+
+    if (!r.ok) {
+        showToast(r.data?.error || JSON.stringify(r.data), 'error');
+        return;
+    }
+
+    showToast('Tạo tài khoản thành công');
+    document.getElementById('fEmail').value = '';
+    document.getElementById('fFullName').value = '';
+    document.getElementById('fPassword').value = '';
+    document.getElementById('fRole').value = 'admin';
+    loadData();
+}
+
+loadData();
+</script>
+{% endblock %}

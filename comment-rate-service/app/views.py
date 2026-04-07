@@ -9,9 +9,35 @@ from .knowledge_base import KnowledgeBaseManager
 from .rag_advisor import BehaviorRAGAdvisor
 
 BOOK_SERVICE_URL = "http://book-service:8000"
+CLOTHES_SERVICE_URL = "http://clothes-service:8000"
+CLOTHES_PRODUCT_ID_OFFSET = 100000
 behavior_service = BehaviorModelService()
 kb_manager = KnowledgeBaseManager()
 rag_advisor = BehaviorRAGAdvisor()
+
+
+def _resolve_product_reference(product_id):
+    try:
+        numeric_id = int(product_id)
+    except Exception:
+        return None, None
+
+    if numeric_id >= CLOTHES_PRODUCT_ID_OFFSET:
+        return "clothes", numeric_id - CLOTHES_PRODUCT_ID_OFFSET
+    return "book", numeric_id
+
+
+def _product_exists(product_id):
+    product_type, real_id = _resolve_product_reference(product_id)
+
+    try:
+        if product_type == "clothes":
+            r = requests.get(f"{CLOTHES_SERVICE_URL}/clothes/{real_id}/", timeout=5)
+        else:
+            r = requests.get(f"{BOOK_SERVICE_URL}/books/{real_id}/", timeout=5)
+        return r.status_code == 200
+    except Exception:
+        return True
 
 
 class ReviewListCreate(APIView):
@@ -21,16 +47,12 @@ class ReviewListCreate(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        """Customer rates/comments on a book"""
+        """Customer rates/comments on a product"""
         book_id = request.data.get('book_id')
-        # Verify book exists via book-service
-        try:
-            r = requests.get(f"{BOOK_SERVICE_URL}/books/")
-            books = r.json()
-            if not any(b["id"] == book_id for b in books):
-                return Response({"error": "Book not found"}, status=404)
-        except Exception:
-            pass
+
+        if not _product_exists(book_id):
+            label = 'Clothes' if int(book_id or 0) >= CLOTHES_PRODUCT_ID_OFFSET else 'Book'
+            return Response({"error": f"{label} not found"}, status=404)
 
         serializer = ReviewSerializer(data=request.data)
         if serializer.is_valid():
@@ -84,7 +106,7 @@ class ReviewDetail(APIView):
 
 
 class BookReviews(APIView):
-    """Get all reviews for a specific book"""
+    """Get all reviews for a specific product reference."""
 
     def get(self, request, book_id):
         reviews = Review.objects.filter(book_id=book_id)

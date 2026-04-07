@@ -6,17 +6,39 @@ from .serializers import CartSerializer, CartItemSerializer
 import requests
 
 BOOK_SERVICE_URL = "http://book-service:8000"
+CLOTHES_SERVICE_URL = "http://clothes-service:8000"
+CLOTHES_PRODUCT_ID_OFFSET = 100000
 
 
-def _get_book_stock(book_id):
+def _resolve_product_reference(product_id):
     try:
-        r = requests.get(f"{BOOK_SERVICE_URL}/books/{book_id}/", timeout=5)
+        numeric_id = int(product_id)
+    except Exception:
+        return None, None
+
+    if numeric_id >= CLOTHES_PRODUCT_ID_OFFSET:
+        return "clothes", numeric_id - CLOTHES_PRODUCT_ID_OFFSET
+    return "book", numeric_id
+
+
+def _get_product_stock(product_id):
+    product_type, real_id = _resolve_product_reference(product_id)
+    if product_type == "clothes":
+        try:
+            r = requests.get(f"{CLOTHES_SERVICE_URL}/clothes/{real_id}/", timeout=5)
+            if r.status_code == 200:
+                product = r.json()
+                return int(product.get("stock") or 0), (product.get("name") or f"Clothes #{real_id}"), product_type
+        except Exception:
+            pass
+    try:
+        r = requests.get(f"{BOOK_SERVICE_URL}/books/{real_id}/", timeout=5)
         if r.status_code == 200:
             book = r.json()
-            return int(book.get("stock") or 0), (book.get("title") or f"Book #{book_id}")
+            return int(book.get("stock") or 0), (book.get("title") or f"Book #{real_id}"), product_type
     except Exception:
         pass
-    return None, None
+    return None, None, product_type or "book"
 
 
 class CartCreate(APIView):
@@ -33,17 +55,24 @@ class AddCartItem(APIView):
         book_id = request.data.get("book_id")
         customer_id = request.data.get("customer_id")
         quantity = request.data.get("quantity", 1)
+        item_type = (request.data.get("item_type") or "book").strip().lower()
 
         if not customer_id:
             return Response({"error": "customer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if item_type not in {"book", "clothes"}:
+            item_type = "book"
 
         # Auto-create cart for customer if it doesn't exist
         cart, _ = Cart.objects.get_or_create(customer_id=customer_id)
 
         requested_qty = int(quantity or 1)
-        stock, title = _get_book_stock(book_id)
+        stock, title, resolved_type = _get_product_stock(book_id)
         if stock is not None and stock < 1:
             return Response({"error": f"'{title}' is out of stock"}, status=status.HTTP_409_CONFLICT)
+
+        if resolved_type:
+            item_type = resolved_type
 
         # Check if book already in cart – if so, increment quantity
         existing = CartItem.objects.filter(cart=cart, book_id=book_id).first()
@@ -64,11 +93,16 @@ class AddCartItem(APIView):
 
         # Validate book exists (optional, non-blocking)
         try:
-            r = requests.get(f"{BOOK_SERVICE_URL}/books/{book_id}/", timeout=5)
-            if r.status_code == 404:
-                return Response({"error": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
+            if item_type == "clothes":
+                r = requests.get(f"{CLOTHES_SERVICE_URL}/clothes/{_resolve_product_reference(book_id)[1]}/", timeout=5)
+                if r.status_code == 404:
+                    return Response({"error": "Clothes not found"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                r = requests.get(f"{BOOK_SERVICE_URL}/books/{_resolve_product_reference(book_id)[1]}/", timeout=5)
+                if r.status_code == 404:
+                    return Response({"error": "Book not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception:
-            pass  # Allow adding even if book-service is down
+            pass  # Allow adding even if product-service is down
 
         if stock is not None and requested_qty > stock:
             return Response(
@@ -123,7 +157,7 @@ class CartItemDetail(APIView):
             return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
 
         new_qty = int(request.data.get("quantity", item.quantity) or item.quantity)
-        stock, title = _get_book_stock(item.book_id)
+        stock, title, _ = _get_product_stock(item.book_id)
         if stock is not None and new_qty > stock:
             return Response(
                 {

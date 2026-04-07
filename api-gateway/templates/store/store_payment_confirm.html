@@ -1,0 +1,139 @@
+{% extends "store/store_base.html" %}
+{% block title %}Xác nhận thanh toán{% endblock %}
+
+{% block extra_css %}
+<style>
+    .confirm-shell {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 40px 24px 64px;
+    }
+
+    .confirm-card {
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 28px;
+    }
+
+    .confirm-title {
+        font-size: 1.4rem;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+
+    .confirm-subtitle {
+        color: var(--text-muted);
+        margin-bottom: 24px;
+    }
+
+    .confirm-summary {
+        background: var(--bg-light);
+        border-radius: var(--radius-sm);
+        padding: 18px;
+        margin-bottom: 20px;
+    }
+
+    .confirm-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 8px 0;
+        font-size: 0.92rem;
+    }
+
+    .confirm-row strong { font-weight: 700; }
+
+    .confirm-note {
+        background: #fff8e6;
+        border: 1px solid #f0d58a;
+        color: #8a6312;
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+        margin-bottom: 20px;
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }
+
+    .confirm-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="confirm-shell">
+    <div class="confirm-card">
+        <div class="confirm-title">💳 Xác nhận thanh toán chuyển khoản</div>
+        <div class="confirm-subtitle">Kiểm tra lại thông tin đơn hàng trước khi tạo đơn.</div>
+
+        <div class="confirm-note">
+            Sau khi bạn xác nhận đã chuyển khoản, hệ thống sẽ tạo đơn hàng và chuyển bạn đến trang đơn hàng.
+        </div>
+
+        <div class="confirm-summary" id="confirmSummary">
+            <div class="confirm-row"><span>Đang tải</span><strong>...</strong></div>
+        </div>
+
+        <div class="confirm-actions">
+            <button class="btn btn-primary" onclick="confirmTransfer()">✅ Tôi đã chuyển khoản</button>
+            <a class="btn btn-outline" href="/store/cart/">← Quay lại giỏ hàng</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function readPendingOrder() {
+        const raw = localStorage.getItem('store_pending_transfer_order');
+        return raw ? JSON.parse(raw) : null;
+    }
+
+    function renderSummary() {
+        const pending = readPendingOrder();
+        const box = document.getElementById('confirmSummary');
+        if (!pending) {
+            box.innerHTML = '<div class="confirm-row"><span>Không có dữ liệu chờ xác nhận</span><strong>—</strong></div>';
+            return;
+        }
+
+        box.innerHTML = `
+            <div class="confirm-row"><span>Khách hàng</span><strong>#${pending.customer_id}</strong></div>
+            <div class="confirm-row"><span>Phương thức</span><strong>Chuyển khoản</strong></div>
+            <div class="confirm-row"><span>Tổng tiền</span><strong>${formatPrice(pending.total_amount || 0)} ₫</strong></div>
+            <div class="confirm-row"><span>Số sản phẩm</span><strong>${pending.item_count || 0}</strong></div>
+            <div class="confirm-row"><span>Người nhận</span><strong>${pending.receiver_name || '—'}</strong></div>
+            <div class="confirm-row"><span>Số điện thoại</span><strong>${pending.receiver_phone || '—'}</strong></div>
+            <div class="confirm-row"><span>Địa chỉ</span><strong>${pending.shipping_address || '—'}</strong></div>
+        `;
+    }
+
+    async function confirmTransfer() {
+        const pending = readPendingOrder();
+        if (!pending) {
+            showToast('Không tìm thấy dữ liệu thanh toán chờ xác nhận', 'error');
+            return;
+        }
+
+        try {
+            await apiCall('/api/proxy/orders/', 'POST', {
+                customer_id: pending.customer_id,
+                payment_method: 'bank_transfer',
+                receiver_name: pending.receiver_name || '',
+                receiver_phone: pending.receiver_phone || '',
+                shipping_address: pending.shipping_address || '',
+            });
+            localStorage.removeItem('store_pending_transfer_order');
+            showToast('Đơn hàng đã được xác nhận và tạo thành công!');
+            setTimeout(() => window.location.href = '/store/orders/', 1200);
+        } catch (e) {
+            showToast('Không thể tạo đơn: ' + e.message, 'error');
+        }
+    }
+
+    renderSummary();
+</script>
+{% endblock %}

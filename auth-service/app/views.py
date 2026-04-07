@@ -131,6 +131,12 @@ class MeView(APIView):
         return Response(UserSerializer(user).data)
 
 
+class UserListView(APIView):
+    def get(self, request):
+        users = UserAccount.objects.all().order_by('-created_at', '-id')
+        return Response(UserSerializer(users, many=True).data)
+
+
 class HealthLiveView(APIView):
     authentication_classes = []
     permission_classes = []

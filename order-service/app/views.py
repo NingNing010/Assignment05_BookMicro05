@@ -7,6 +7,7 @@ import requests
 import json
 import os
 from decimal import Decimal, InvalidOperation
+import math
 
 try:
     import pika
@@ -17,6 +18,8 @@ PAY_SERVICE_URL = "http://pay-service:8000"
 SHIP_SERVICE_URL = "http://ship-service:8000"
 CART_SERVICE_URL = "http://cart-service:8000"
 BOOK_SERVICE_URL = "http://book-service:8000"
+CLOTHES_SERVICE_URL = "http://clothes-service:8000"
+CLOTHES_PRODUCT_ID_OFFSET = 100000
 EVENT_BUS_URL = os.getenv("EVENT_BUS_URL", "")
 RABBITMQ_ENABLED = os.getenv("RABBITMQ_ENABLED", "false").lower() == "true"
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
@@ -31,6 +34,35 @@ def _to_decimal(value, default="0"):
         return Decimal(default)
 
 
+def _resolve_product_reference(product_id):
+    try:
+        numeric_id = int(product_id)
+    except Exception:
+        return None, None
+
+    if numeric_id >= CLOTHES_PRODUCT_ID_OFFSET:
+        return "clothes", numeric_id - CLOTHES_PRODUCT_ID_OFFSET
+    return "book", numeric_id
+
+
+def _get_product(product_id):
+    product_type, real_id = _resolve_product_reference(product_id)
+    if product_type == "clothes":
+        try:
+            r = requests.get(f"{CLOTHES_SERVICE_URL}/clothes/{real_id}/", timeout=5)
+            if r.status_code == 200:
+                return r.json(), product_type
+        except Exception:
+            pass
+    try:
+        r = requests.get(f"{BOOK_SERVICE_URL}/books/{real_id}/", timeout=5)
+        if r.status_code == 200:
+            return r.json(), "book"
+    except Exception:
+        pass
+    return None, product_type or "book"
+
+
 def _resolve_item_price(cart_item):
     # Prefer price from cart payload if available.
     if cart_item.get("price") is not None:
@@ -41,10 +73,9 @@ def _resolve_item_price(cart_item):
     if not book_id:
         return Decimal("0")
     try:
-        r = requests.get(f"http://book-service:8000/books/{book_id}/", timeout=5)
-        if r.status_code == 200:
-            book = r.json()
-            return _to_decimal(book.get("price"), "0")
+        product, _ = _get_product(book_id)
+        if product:
+            return _to_decimal(product.get("price"), "0")
     except Exception:
         pass
     return Decimal("0")
@@ -106,9 +137,44 @@ def _publish_event(topic, payload):
 
 class OrderListCreate(APIView):
     def get(self, request):
-        orders = Order.objects.all()
-        serializer = OrderSerializer(orders, many=True)
-        return Response(serializer.data)
+        orders = Order.objects.all().order_by('-created_at', '-id')
+
+        customer_id = request.query_params.get('customer_id')
+        if customer_id not in (None, ''):
+            try:
+                orders = orders.filter(customer_id=int(customer_id))
+            except Exception:
+                return Response({"error": "customer_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+        page_raw = request.query_params.get('page')
+        page_size_raw = request.query_params.get('page_size')
+        use_pagination = page_raw is not None or page_size_raw is not None
+
+        if not use_pagination:
+            serializer = OrderSerializer(orders, many=True)
+            return Response(serializer.data)
+
+        try:
+            page = max(1, int(page_raw or 1))
+            page_size = max(1, min(100, int(page_size_raw or 10)))
+        except Exception:
+            return Response({"error": "page and page_size must be integers"}, status=status.HTTP_400_BAD_REQUEST)
+
+        total = orders.count()
+        total_pages = max(1, math.ceil(total / page_size))
+        if page > total_pages:
+            page = total_pages
+
+        start = (page - 1) * page_size
+        end = start + page_size
+        serializer = OrderSerializer(orders[start:end], many=True)
+        return Response({
+            "results": serializer.data,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+        })
 
     def post(self, request):
         """Create order with Saga orchestration and compensating actions."""
@@ -118,8 +184,17 @@ class OrderListCreate(APIView):
 
         payment_method = _normalize_payment_method(request.data.get('payment_method', 'credit_card'))
         shipping_method = request.data.get('shipping_method', 'standard')
+        receiver_name = (request.data.get('receiver_name') or '').strip()
+        receiver_phone = (request.data.get('receiver_phone') or '').strip()
+        shipping_address = (request.data.get('shipping_address') or '').strip()
         simulate_payment_failure = bool(request.data.get('simulate_payment_failure', False))
         simulate_shipping_failure = bool(request.data.get('simulate_shipping_failure', False))
+
+        if not receiver_name or not receiver_phone or not shipping_address:
+            return Response(
+                {"error": "receiver_name, receiver_phone and shipping_address are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get cart items from cart-service
         try:
@@ -136,13 +211,13 @@ class OrderListCreate(APIView):
         for item in cart_items:
             book_id = item.get('book_id')
             quantity = int(item.get('quantity', 1) or 1)
-            book = _get_book(book_id)
+            book, product_type = _get_product(book_id)
             if not book:
                 insufficient_items.append({
                     "book_id": book_id,
                     "requested": quantity,
                     "available": 0,
-                    "title": f"Book #{book_id}",
+                    "title": f"{product_type.title()} #{book_id}",
                     "reason": "Book not found or unavailable",
                 })
                 continue
@@ -153,7 +228,7 @@ class OrderListCreate(APIView):
                     "book_id": book_id,
                     "requested": quantity,
                     "available": available,
-                    "title": book.get('title') or f"Book #{book_id}",
+                    "title": book.get('title') or book.get('name') or f"{product_type.title()} #{book_id}",
                     "reason": "Insufficient stock",
                 })
 
@@ -226,6 +301,9 @@ class OrderListCreate(APIView):
                 "order_id": order.id,
                 "customer_id": customer_id,
                 "method": shipping_method,
+                "receiver_name": receiver_name,
+                "receiver_phone": receiver_phone,
+                "shipping_address": shipping_address,
             }, timeout=8)
             if ship_resp.status_code >= 400:
                 raise RuntimeError(f"Shipping reserve failed: {ship_resp.text}")
@@ -261,19 +339,19 @@ class OrderListCreate(APIView):
         for item in cart_items:
             book_id = item.get('book_id')
             quantity = int(item.get('quantity', 1) or 1)
-            book = _get_book(book_id)
+            book, product_type = _get_product(book_id)
             if not book:
-                stock_update_errors.append({"book_id": book_id, "reason": "Book not found when updating stock"})
+                stock_update_errors.append({"book_id": book_id, "reason": f"{product_type.title()} not found when updating stock"})
                 continue
 
             current_stock = int(book.get('stock') or 0)
             new_stock = max(0, current_stock - quantity)
             try:
-                requests.patch(
-                    f"{BOOK_SERVICE_URL}/books/{book_id}/",
-                    json={"stock": new_stock},
-                    timeout=8,
-                )
+                _, real_id = _resolve_product_reference(book_id)
+                if product_type == "clothes":
+                    requests.patch(f"{CLOTHES_SERVICE_URL}/clothes/{real_id}/", json={"stock": new_stock}, timeout=8)
+                else:
+                    requests.patch(f"{BOOK_SERVICE_URL}/books/{real_id}/", json={"stock": new_stock}, timeout=8)
             except Exception as e:
                 stock_update_errors.append({"book_id": book_id, "reason": str(e)})
 

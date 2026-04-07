@@ -1,0 +1,151 @@
+﻿{% extends "base.html" %}
+{% block title %}Clothes{% endblock %}
+{% block nav_clothes %}active{% endblock %}
+{% block page_title %}Clothes{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal()">Add Clothes</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Brand</th>
+                    <th>Size</th>
+                    <th>Color</th>
+                    <th>Image</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="9" style="text-align:center;color:#666;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal">
+        <h3 id="modalTitle">Add New Clothes</h3>
+        <input type="hidden" id="editId">
+        <div class="form-row">
+            <div class="form-group"><label>Name *</label><input class="form-control" id="fName" placeholder="Clothes name"></div>
+            <div class="form-group"><label>Brand</label><input class="form-control" id="fBrand" placeholder="Brand"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Size</label><input class="form-control" id="fSize" placeholder="M / L / XL"></div>
+            <div class="form-group"><label>Color</label><input class="form-control" id="fColor" placeholder="Black"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Price *</label><input class="form-control" id="fPrice" type="number" step="0.01" placeholder="199000"></div>
+            <div class="form-group"><label>Stock *</label><input class="form-control" id="fStock" type="number" min="1" step="1" placeholder="100"></div>
+        </div>
+        <div class="form-group"><label>Image URL</label><input class="form-control" id="fImageUrl" placeholder="https://..."></div>
+        <div class="form-group"><label>Description</label><textarea class="form-control" id="fDescription" rows="3" placeholder="Product description..."></textarea></div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveClothes()">Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API = '/api/proxy/clothes';
+
+async function loadData() {
+    try {
+        const res = await fetch(API + '/');
+        const items = await res.json();
+        const tbody = document.getElementById('tableBody');
+        if (!Array.isArray(items) || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">No data</div><p>No clothes yet. Click Add Clothes to get started.</p></div></td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map(c => `
+            <tr>
+                <td>#${c.id}</td>
+                <td><strong>${c.name}</strong></td>
+                <td>${c.brand || '-'}</td>
+                <td>${c.size || '-'}</td>
+                <td>${c.color || '-'}</td>
+                <td>${c.image_url ? '<a href="' + c.image_url + '" target="_blank" rel="noopener">Link</a>' : '-'}</td>
+                <td><span class="tag tag-green">${Number(c.price || 0).toLocaleString('vi-VN')} VND</span></td>
+                <td>${c.stock}</td>
+                <td>
+                    <button class="btn btn-sm btn-blue" onclick='editClothes(${JSON.stringify(c)})'>Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteClothes(${c.id})">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="9" style="color:#e94560;">Failed to load clothes</td></tr>';
+    }
+}
+
+function openModal() {
+    document.getElementById('editId').value = '';
+    document.getElementById('modalTitle').textContent = 'Add New Clothes';
+    ['fName', 'fBrand', 'fSize', 'fColor', 'fPrice', 'fStock', 'fImageUrl', 'fDescription'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+function editClothes(c) {
+    document.getElementById('editId').value = c.id;
+    document.getElementById('modalTitle').textContent = 'Edit Clothes #' + c.id;
+    document.getElementById('fName').value = c.name || '';
+    document.getElementById('fBrand').value = c.brand || '';
+    document.getElementById('fSize').value = c.size || '';
+    document.getElementById('fColor').value = c.color || '';
+    document.getElementById('fPrice').value = c.price || '';
+    document.getElementById('fStock').value = c.stock || '';
+    document.getElementById('fImageUrl').value = c.image_url || '';
+    document.getElementById('fDescription').value = c.description || '';
+    document.getElementById('modal').classList.add('show');
+}
+
+async function saveClothes() {
+    const id = document.getElementById('editId').value;
+    const stockInt = Number(document.getElementById('fStock').value);
+    if (!Number.isInteger(stockInt) || stockInt <= 0) {
+        showToast('Stock must be an integer greater than 0', 'error');
+        return;
+    }
+
+    const body = {
+        name: document.getElementById('fName').value,
+        brand: document.getElementById('fBrand').value,
+        size: document.getElementById('fSize').value,
+        color: document.getElementById('fColor').value,
+        price: document.getElementById('fPrice').value,
+        stock: stockInt,
+        image_url: document.getElementById('fImageUrl').value.trim(),
+        description: document.getElementById('fDescription').value,
+    };
+    const url = id ? `${API}/${id}/` : API + '/';
+    const method = id ? 'PUT' : 'POST';
+    const r = await apiCall(url, method, body);
+    if (r.ok) { showToast(id ? 'Clothes updated' : 'Clothes created'); closeModal(); loadData(); }
+    else { showToast('Error: ' + JSON.stringify(r.data), 'error'); }
+}
+
+async function deleteClothes(id) {
+    if (!confirm('Delete clothes #' + id + '?')) return;
+    await apiCall(`${API}/${id}/`, 'DELETE');
+    showToast('Clothes deleted');
+    loadData();
+}
+
+loadData();
+</script>
+{% endblock %}

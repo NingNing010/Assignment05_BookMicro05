@@ -8,6 +8,7 @@ import time
 import uuid
 import logging
 import re
+import random
 import jwt
 import unicodedata
 
@@ -450,7 +451,8 @@ def _recommend_books_for_question(question, focus_category=None, max_items=4, al
             ranked.append((score, book))
 
     ranked.sort(key=lambda item: (-item[0], item[1].get("title", "")))
-    selected = [book for _, book in ranked[:max_items]]
+    candidate_limit = max(max_items * 3, max_items)
+    selected = [book for _, book in ranked[:candidate_limit]]
 
     # For upsell-style flows, make sure nearby categories appear even if the exact
     # category dominates the score. This gives a broader, more useful mix.
@@ -463,17 +465,35 @@ def _recommend_books_for_question(question, focus_category=None, max_items=4, al
                     continue
                 selected.append(book)
                 selected_ids.add(book.get("id"))
-                if len(selected) >= max_items:
+                if len(selected) >= candidate_limit:
                     break
-            if len(selected) >= max_items:
+            if len(selected) >= candidate_limit:
                 break
+
+    selected = _unique_books_by_id(selected)
 
     if not selected:
         # Final fallback: always return a few in-stock books instead of an empty UI.
         in_stock = [book for book in books if int(book.get("stock", 0) or 0) > 0]
         return in_stock[:max_items]
 
-    return selected[:max_items]
+    if len(selected) <= max_items:
+        return selected[:max_items]
+
+    rng = random.SystemRandom()
+    return rng.sample(selected, max_items)
+
+
+def _unique_books_by_id(books):
+    unique = []
+    seen_ids = set()
+    for book in books:
+        book_id = book.get("id")
+        if book_id in seen_ids:
+            continue
+        seen_ids.add(book_id)
+        unique.append(book)
+    return unique
 
 
 def _fetch_books_by_category(category_name):
@@ -772,6 +792,14 @@ def manager_list(request):
     return render(request, "managers.html")
 
 
+def clothes_list(request):
+    return render(request, "clothes.html")
+
+
+def account_list(request):
+    return render(request, "accounts.html")
+
+
 # ──────────────────────────────────────────────
 # Customer-facing Store Views
 # ──────────────────────────────────────────────
@@ -785,6 +813,14 @@ def store_books(request):
 def store_book_detail(request, book_id):
     return render(request, "store/store_book_detail.html", {"book_id": book_id})
 
+
+def store_clothes(request):
+    return render(request, "store/store_clothes.html")
+
+
+def store_clothes_detail(request, clothes_id):
+    return render(request, "store/store_clothes_detail.html", {"clothes_id": clothes_id})
+
 def store_cart(request):
     return render(request, "store/store_cart.html")
 
@@ -793,6 +829,10 @@ def store_orders(request):
 
 def store_reviews(request):
     return render(request, "store/store_reviews.html")
+
+
+def store_payment_confirm(request):
+    return render(request, "store/store_payment_confirm.html")
 
 def store_ai_advisor(request):
     return render(request, "store/store_ai_advisor.html")

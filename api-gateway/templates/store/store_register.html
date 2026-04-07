@@ -101,6 +101,7 @@
             <input class="form-control" type="email" id="regEmail" placeholder="email@example.com">
         </div>
 
+
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label">Mật khẩu *</label>
@@ -138,6 +139,7 @@
         const name = document.getElementById('regName').value.trim();
         const fullName = document.getElementById('regFullName').value.trim();
         const email = document.getElementById('regEmail').value.trim();
+        const role = 'customer';
         const password = document.getElementById('regPassword').value;
         const password2 = document.getElementById('regPassword2').value;
         const phone = document.getElementById('regPhone').value.trim();
@@ -173,7 +175,7 @@
                     email,
                     password,
                     full_name: fullName,
-                    role: 'customer'
+                    role
                 })
             });
             const authData = await authRes.json();
@@ -181,9 +183,12 @@
                 throw new Error(authData.error || JSON.stringify(authData));
             }
 
-            const customer = await apiCall('/api/proxy/customers/', 'POST', {
-                name, full_name: fullName, email, phone, address
-            });
+            let customer = null;
+            if (role === 'customer') {
+                customer = await apiCall('/api/proxy/customers/', 'POST', {
+                    name, full_name: fullName, email, phone, address
+                });
+            }
 
             const loginRes = await fetch('/api/auth/login/', {
                 method: 'POST',
@@ -201,9 +206,15 @@
                 user: loginData.user || authData || null
             });
 
-            setCustomer(customer);
-            showAlert('Đăng ký thành công!', 'success');
-            setTimeout(() => window.location.href = '/store/', 800);
+            if (role === 'customer' && customer) {
+                setCustomer(customer);
+                showAlert('Đăng ký thành công!', 'success');
+                setTimeout(() => window.location.href = '/store/', 800);
+            } else {
+                localStorage.removeItem('store_customer');
+                showAlert('Đăng ký tài khoản quản trị thành công!', 'success');
+                setTimeout(() => window.location.href = '/admin-panel/', 800);
+            }
         } catch(e) {
             errDiv.textContent = 'Lỗi: ' + e.message;
             errDiv.style.display = 'block';

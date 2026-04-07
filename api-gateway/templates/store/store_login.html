@@ -114,6 +114,17 @@
 
 {% block scripts %}
 <script>
+    function getSafeStoreNextPath(rawNext) {
+        const next = String(rawNext || '').trim();
+        if (next.startsWith('/admin-panel/')) {
+            return '/store/';
+        }
+        if (next.startsWith('/store/') && next !== '/store/login/' && next !== '/store/register/') {
+            return next;
+        }
+        return '/store/';
+    }
+
     async function doLogin() {
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
@@ -171,6 +182,16 @@
                 user: authData.user || null
             });
 
+            const role = String(authData.user?.role || '').toLowerCase();
+            const isAdminSide = ['admin', 'manager', 'staff'].includes(role);
+
+            if (isAdminSide) {
+                localStorage.removeItem('store_customer');
+                showAlert('Đăng nhập quản trị thành công!', 'success');
+                setTimeout(() => window.location.href = '/admin-panel/', 300);
+                return;
+            }
+
             // Sync customer profile for storefront pages.
             const customersRes = await fetch('/api/proxy/customers/');
             const customers = await customersRes.json();
@@ -183,7 +204,7 @@
             showAlert('Đăng nhập thành công!', 'success');
 
             const params = new URLSearchParams(window.location.search);
-            const next = params.get('next') || '/store/';
+            const next = getSafeStoreNextPath(params.get('next'));
             setTimeout(() => window.location.href = next, 300);
         } catch(e) {
             errDiv.textContent = 'Lỗi kết nối: ' + e.message;
@@ -194,8 +215,13 @@
     }
 
     // If already logged in, redirect
-    if (getCustomer() && getAccessToken()) {
-        window.location.href = '/store/';
+    if (getAccessToken()) {
+        const role = String(getAuthSession()?.user?.role || '').toLowerCase();
+        if (['admin', 'manager', 'staff'].includes(role)) {
+            window.location.href = '/admin-panel/';
+        } else if (getCustomer()) {
+            window.location.href = '/store/';
+        }
     }
 </script>
 {% endblock %}

@@ -65,6 +65,85 @@
 
     .order-actions { display: flex; gap: 8px; }
 
+    .orders-pagination {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 18px;
+        flex-wrap: wrap;
+    }
+
+    .orders-pagination button {
+        min-width: 36px;
+        height: 36px;
+        border: 2px solid var(--border);
+        background: var(--bg-white);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-family: inherit;
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .orders-pagination button.active {
+        border-color: var(--navy);
+        background: var(--navy);
+        color: #fff;
+    }
+
+    .order-detail-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(14, 18, 29, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 16px;
+    }
+
+    .order-detail-overlay.show { display: flex; }
+
+    .order-detail-panel {
+        width: min(760px, 100%);
+        max-height: 90vh;
+        overflow: auto;
+        background: var(--bg-white);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
+        padding: 22px;
+    }
+
+    .order-detail-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        align-items: center;
+    }
+
+    .order-detail-row:last-child { border-bottom: none; }
+
+    .order-detail-item-title {
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+
+    .order-detail-item-meta {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+    }
+
+    .order-detail-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 18px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
     /* Status colors */
     .status-pending { background: #fff3e0; color: #e67e22; }
     .status-confirmed { background: #e8f0fd; color: #2471a3; }
@@ -86,6 +165,10 @@
         <div class="spinner"></div>
     </div>
 </section>
+
+<div class="order-detail-overlay" id="orderDetailOverlay" onclick="if(event.target===this)closeOrderDetail()">
+    <div class="order-detail-panel" id="orderDetailPanel"></div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -97,19 +180,24 @@
         delivered: { label: 'Đã giao', cls: 'status-delivered', icon: '📬' },
         cancelled: { label: 'Đã hủy', cls: 'status-cancelled', icon: '❌' },
     };
+    let ordersCache = [];
+    let currentPage = 1;
+    const pageSize = 5;
 
     async function loadOrders() {
         if (!requireLogin()) return;
         const c = getCustomer();
 
         try {
-            const orders = await apiCall('/api/proxy/orders/');
-            const allOrders = Array.isArray(orders) ? orders : [];
-            const myOrders = allOrders.filter(o => o.customer_id === c.id);
+            const payload = await apiCall(`/api/proxy/orders/?customer_id=${c.id}&page=${currentPage}&page_size=${pageSize}`);
+            const myOrders = Array.isArray(payload?.results) ? payload.results : [];
+            const total = Number(payload?.total || myOrders.length);
+            const totalPages = Number(payload?.total_pages || 1);
+            ordersCache = myOrders;
 
-            document.getElementById('orderSubtitle').textContent = `${myOrders.length} đơn hàng`;
+            document.getElementById('orderSubtitle').textContent = `${total} đơn hàng`;
 
-            if (myOrders.length === 0) {
+            if (total === 0) {
                 document.getElementById('ordersList').innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">📦</div>
@@ -121,13 +209,10 @@
                 return;
             }
 
-            // Sort newest first
-            myOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-            document.getElementById('ordersList').innerHTML = myOrders.map(o => {
+            const cardsHtml = myOrders.map(o => {
                 const st = statusMap[o.status] || statusMap.pending;
-                const items = o.items || [];
                 const date = o.created_at ? new Date(o.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const itemCount = Array.isArray(o.items) ? o.items.length : 0;
 
                 return `
                     <div class="order-card">
@@ -139,17 +224,13 @@
                             <span class="tag ${st.cls}">${st.icon} ${st.label}</span>
                         </div>
                         <div class="order-body">
-                            <div class="order-items-list">
-                                ${items.length > 0 ? items.map(item => `
-                                    <div class="order-item-row">
-                                        <span>📖 Sách #${item.book_id} × ${item.quantity}</span>
-                                        <span style="font-weight:600">${formatPrice(item.price)} ₫</span>
-                                    </div>
-                                `).join('') : '<div style="color:var(--text-muted);font-size:0.85rem">Không có chi tiết</div>'}
-                            </div>
                             <div class="order-footer">
-                                <div class="order-total">Tổng: ${formatPrice(o.total_amount)} ₫</div>
+                                <div>
+                                    <div class="order-total">Tổng: ${formatPrice(o.total_amount)} ₫</div>
+                                    <div style="color:var(--text-muted);font-size:0.85rem;margin-top:4px">${itemCount} sản phẩm</div>
+                                </div>
                                 <div class="order-actions">
+                                    <button class="btn btn-outline btn-sm" onclick="openOrderDetail(${o.id})">🔎 Xem chi tiết</button>
                                     ${o.status === 'shipped' ? `<button class="btn btn-success btn-sm" onclick="updateOrder(${o.id},'delivered')">📬 Đã nhận hàng</button>` : ''}
                                     ${o.status === 'pending' ? `<button class="btn btn-danger btn-sm" onclick="updateOrder(${o.id},'cancelled')">❌ Hủy đơn</button>` : ''}
                                 </div>
@@ -158,6 +239,12 @@
                     </div>
                 `;
             }).join('');
+
+            const pagingHtml = totalPages > 1
+                ? `<div class="orders-pagination">${Array.from({ length: totalPages }, (_, i) => i + 1).map(p => `<button class="${p === currentPage ? 'active' : ''}" onclick="gotoOrderPage(${p})">${p}</button>`).join('')}</div>`
+                : '';
+
+            document.getElementById('ordersList').innerHTML = cardsHtml + pagingHtml;
         } catch(e) {
             document.getElementById('ordersList').innerHTML = `
                 <div class="empty-state">
@@ -167,6 +254,68 @@
                 </div>
             `;
         }
+    }
+
+    function gotoOrderPage(page) {
+        currentPage = page;
+        loadOrders();
+    }
+
+    function closeOrderDetail() {
+        document.getElementById('orderDetailOverlay').classList.remove('show');
+    }
+
+    async function openOrderDetail(orderId) {
+        const order = ordersCache.find(o => Number(o.id) === Number(orderId));
+        const panel = document.getElementById('orderDetailPanel');
+        const overlay = document.getElementById('orderDetailOverlay');
+        overlay.classList.add('show');
+        panel.innerHTML = '<div class="spinner"></div>';
+
+        if (!order) {
+            panel.innerHTML = '<div class="empty-state"><div class="empty-title">Không tìm thấy đơn hàng</div></div>';
+            return;
+        }
+
+        const detailedItems = await Promise.all((order.items || []).map(async item => {
+            const product = await fetchStoreProductById(item.book_id);
+            return { ...item, product };
+        }));
+
+        panel.innerHTML = `
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px">
+                <div>
+                    <h3 style="font-size:1.2rem">Đơn hàng #${order.id}</h3>
+                    <div style="color:var(--text-muted);font-size:0.85rem;margin-top:4px">${order.created_at ? new Date(order.created_at).toLocaleString('vi-VN') : ''}</div>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="closeOrderDetail()">Đóng</button>
+            </div>
+            <div class="order-items-list">
+                ${detailedItems.length > 0 ? detailedItems.map(item => {
+                    const product = item.product || {};
+                    const isClothes = product._type === 'clothes';
+                    const icon = isClothes ? '👕' : '📖';
+                    const title = formatStoreProductTitle(product) || (isClothes ? `Quần áo #${item.book_id}` : `Sách #${item.book_id}`);
+                    const meta = isClothes
+                        ? `🏷️ ${product.brand || '—'} • ${product.size || '—'} • ${product.color || '—'}`
+                        : `✍️ ${product.author || '—'}`;
+                    const subtotal = Number(item.price || 0) * Number(item.quantity || 1);
+                    return `
+                        <div class="order-detail-row">
+                            <div>
+                                <div class="order-detail-item-title">${icon} ${title}</div>
+                                <div class="order-detail-item-meta">${meta} • Số lượng: ${item.quantity}</div>
+                            </div>
+                            <div style="font-weight:700">${formatPrice(subtotal)} ₫</div>
+                        </div>
+                    `;
+                }).join('') : '<div style="color:var(--text-muted);font-size:0.85rem">Không có chi tiết</div>'}
+            </div>
+            <div class="order-detail-footer">
+                <div style="font-size:1.05rem;font-weight:800;color:var(--accent)">Tổng: ${formatPrice(order.total_amount)} ₫</div>
+                <button class="btn btn-outline btn-sm" onclick="closeOrderDetail()">Đóng</button>
+            </div>
+        `;
     }
 
     async function updateOrder(orderId, newStatus) {

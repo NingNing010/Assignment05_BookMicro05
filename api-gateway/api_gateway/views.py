@@ -12,7 +12,7 @@ import random
 import jwt
 import unicodedata
 
-BOOK_SERVICE_URL = "http://book-service:8000"
+PRODUCT_SERVICE_URL = "http://product-service:8000"  # DDD — replaces book/clothes/catalog
 CART_SERVICE_URL = "http://cart-service:8000"
 CUSTOMER_SERVICE_URL = "http://customer-service:8000"
 STAFF_SERVICE_URL = "http://staff-service:8000"
@@ -20,11 +20,9 @@ ORDER_SERVICE_URL = "http://order-service:8000"
 PAY_SERVICE_URL = "http://pay-service:8000"
 SHIP_SERVICE_URL = "http://ship-service:8000"
 COMMENT_RATE_SERVICE_URL = "http://comment-rate-service:8000"
-CATALOG_SERVICE_URL = "http://catalog-service:8000"
 RECOMMENDER_SERVICE_URL = "http://recommender-ai-service:8000"
 MANAGER_SERVICE_URL = "http://manager-service:8000"
 AUTH_SERVICE_URL = "http://auth-service:8000"
-CLOTHES_SERVICE_URL = "http://clothes-service:8000"
 
 JWT_SECRET = os.getenv("JWT_SECRET", "bookstore-jwt-secret")
 JWT_ALGORITHM = "HS256"
@@ -52,9 +50,14 @@ SERVICE_ROLE_POLICY = {
 # Service URL mapping for API proxy
 # ──────────────────────────────────────────────
 SERVICE_MAP = {
-    'books': BOOK_SERVICE_URL,
-    'publishers': BOOK_SERVICE_URL,
-    'categories': BOOK_SERVICE_URL,
+    'books': PRODUCT_SERVICE_URL,
+    'publishers': PRODUCT_SERVICE_URL,
+    'categories': PRODUCT_SERVICE_URL,
+    'products': PRODUCT_SERVICE_URL,
+    'clothes': PRODUCT_SERVICE_URL,
+    'brands': PRODUCT_SERVICE_URL,
+    'product-types': PRODUCT_SERVICE_URL,
+    'variants': PRODUCT_SERVICE_URL,
     'customers': CUSTOMER_SERVICE_URL,
     'carts': CART_SERVICE_URL,
     'cart-items': CART_SERVICE_URL,
@@ -65,7 +68,6 @@ SERVICE_MAP = {
     'staff': STAFF_SERVICE_URL,
     'managers': MANAGER_SERVICE_URL,
     'recommendations': RECOMMENDER_SERVICE_URL,
-    'clothes': CLOTHES_SERVICE_URL,
 }
 
 
@@ -248,7 +250,7 @@ def _extract_complaint_exclusion_terms(question):
 def _lookup_book_category_by_title(book_title):
     """Look up a book title in the catalog and return its category name."""
     try:
-        all_books_res = requests.get(f"{BOOK_SERVICE_URL}/books/", timeout=5)
+        all_books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
         if all_books_res.status_code != 200:
             return None
 
@@ -269,7 +271,7 @@ def _lookup_book_category_by_title(book_title):
 def _fetch_catalog_books():
     """Fetch the full book catalog once for scoring and filtering."""
     try:
-        books_res = requests.get(f"{BOOK_SERVICE_URL}/books/", timeout=5)
+        books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
         if books_res.status_code != 200:
             return []
 
@@ -499,7 +501,7 @@ def _unique_books_by_id(books):
 def _fetch_books_by_category(category_name):
     """Fetch books from book service filtered by category."""
     try:
-        all_books_res = requests.get(f"{BOOK_SERVICE_URL}/books/", timeout=5)
+        all_books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
         if all_books_res.status_code != 200:
             return []
         
@@ -523,7 +525,7 @@ def _fetch_books_by_category(category_name):
 def _fetch_other_category_books(excluded_category, excluded_title=None, excluded_terms=None):
     """Fetch books from different categories (for complaint scenario)."""
     try:
-        all_books_res = requests.get(f"{BOOK_SERVICE_URL}/books/", timeout=5)
+        all_books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
         if all_books_res.status_code != 200:
             return []
         
@@ -602,7 +604,7 @@ def _build_rag_answer(question, customer_id=None):
             recommended_books = _fetch_other_category_books(topic, excluded_title, excluded_terms)
         else:
             try:
-                books_res = requests.get(f"{BOOK_SERVICE_URL}/books/", timeout=5)
+                books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
                 if books_res.status_code == 200:
                     books = books_res.json()
                     if isinstance(books, list):
@@ -989,10 +991,9 @@ def health_ready(request):
     services = {
         "auth": AUTH_SERVICE_URL,
         "customer": CUSTOMER_SERVICE_URL,
-        "book": BOOK_SERVICE_URL,
+        "product": PRODUCT_SERVICE_URL,
         "cart": CART_SERVICE_URL,
         "order": ORDER_SERVICE_URL,
-        "clothes": CLOTHES_SERVICE_URL,
     }
     ready = True
     for name, url in services.items():

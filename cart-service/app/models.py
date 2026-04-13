@@ -10,8 +10,8 @@ class Cart(models.Model):
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
-    book_id = models.IntegerField()
+    product_id = models.IntegerField()  # References product-service Product.id
     quantity = models.IntegerField()
 
     def __str__(self):
-        return f"Book {self.book_id} x{self.quantity}"
+        return f"Product {self.product_id} x{self.quantity}"

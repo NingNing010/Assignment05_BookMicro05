@@ -171,6 +171,61 @@ class KnowledgeBaseRebuild(APIView):
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class KnowledgeGraphView(APIView):
+    """Return behavior knowledge graph built from review DB."""
+
+    def get(self, request):
+        rebuild = str(request.query_params.get("rebuild") or "").strip().lower() in {"1", "true", "yes"}
+        try:
+            if rebuild:
+                save_result = kb_manager.save_behavior_graph(Review.objects.all())
+                graph = kb_manager.load_behavior_graph()
+                return Response(
+                    {
+                        "message": save_result.get("message"),
+                        "graph_file": save_result.get("graph_file"),
+                        "graph": graph,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            graph = kb_manager.load_behavior_graph()
+            if not graph:
+                save_result = kb_manager.save_behavior_graph(Review.objects.all())
+                graph = kb_manager.load_behavior_graph()
+                return Response(
+                    {
+                        "message": save_result.get("message"),
+                        "graph_file": save_result.get("graph_file"),
+                        "graph": graph,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            return Response({"graph": graph}, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class KnowledgeGraphRebuild(APIView):
+    """Force rebuild behavior graph from review DB."""
+
+    def post(self, request):
+        try:
+            result = kb_manager.save_behavior_graph(Review.objects.all())
+            graph = kb_manager.load_behavior_graph()
+            return Response(
+                {
+                    "message": result.get("message"),
+                    "graph_file": result.get("graph_file"),
+                    "meta": (graph or {}).get("meta", {}),
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class RAGBehaviorChat(APIView):
     """RAG chat for customer behavior advisory."""
 

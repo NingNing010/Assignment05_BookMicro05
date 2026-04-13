@@ -17,8 +17,11 @@ services:
       - DB_PASSWORD=mattroi010
       - DB_NAME=bookstore_auth
 
-  book-service:
-    build: ./book-service
+  # ── Product Service (DDD) ──────────────────────
+  # Replaces: book-service, clothes-service, catalog-service
+  # Bounded Context: Catalog (Product)
+  product-service:
+    build: ./product-service
     ports:
       - "8002:8000"
     environment:
@@ -26,7 +29,7 @@ services:
       - DB_PORT=3306
       - DB_USER=bookstore_user
       - DB_PASSWORD=mattroi010
-      - DB_NAME=bookstore_book
+      - DB_NAME=bookstore_product
 
   cart-service:
     build: ./cart-service
@@ -39,7 +42,7 @@ services:
       - DB_PASSWORD=mattroi010
       - DB_NAME=bookstore_cart
     depends_on:
-      - book-service
+      - product-service
 
   customer-service:
     build: ./customer-service
@@ -65,7 +68,7 @@ services:
       - DB_PASSWORD=mattroi010
       - DB_NAME=bookstore_staff
     depends_on:
-      - book-service
+      - product-service
 
   manager-service:
     build: ./manager-service
@@ -79,19 +82,6 @@ services:
       - DB_NAME=bookstore_manager
     depends_on:
       - staff-service
-
-  catalog-service:
-    build: ./catalog-service
-    ports:
-      - "8006:8000"
-    environment:
-      - DB_HOST=host.docker.internal
-      - DB_PORT=3306
-      - DB_USER=bookstore_user
-      - DB_PASSWORD=mattroi010
-      - DB_NAME=bookstore_catalog
-    depends_on:
-      - book-service
 
   pay-service:
     build: ./pay-service
@@ -146,7 +136,7 @@ services:
       - DB_PASSWORD=mattroi010
       - DB_NAME=bookstore_comment_rate
     depends_on:
-      - book-service
+      - product-service
 
   recommender-ai-service:
     build: ./recommender-ai-service
@@ -159,19 +149,8 @@ services:
       - DB_PASSWORD=mattroi010
       - DB_NAME=bookstore_recommender
     depends_on:
-      - book-service
+      - product-service
       - comment-rate-service
-
-  clothes-service:
-    build: ./clothes-service
-    ports:
-      - "8013:8000"
-    environment:
-      - DB_HOST=host.docker.internal
-      - DB_PORT=3306
-      - DB_USER=bookstore_user
-      - DB_PASSWORD=mattroi010
-      - DB_NAME=bookstore_clothes
 
   api-gateway:
     build: ./api-gateway
@@ -187,14 +166,12 @@ services:
     depends_on:
       - auth-service
       - customer-service
-      - book-service
+      - product-service
       - cart-service
       - staff-service
       - manager-service
-      - catalog-service
       - order-service
       - ship-service
       - pay-service
       - comment-rate-service
       - recommender-ai-service
-      - clothes-service

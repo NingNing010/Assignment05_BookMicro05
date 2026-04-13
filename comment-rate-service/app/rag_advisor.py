@@ -181,15 +181,18 @@ class BehaviorRAGAdvisor:
         if not question:
             return {"error": "question là bắt buộc"}
 
+        review_items = list(reviews)
         kb_docs = self.kb.load_documents()
-        dynamic_docs = self._build_dynamic_docs(reviews=reviews, customer_id=customer_id)
-        all_docs = kb_docs + dynamic_docs
+        dynamic_docs = self._build_dynamic_docs(reviews=review_items, customer_id=customer_id)
+        graph = self.kb.build_behavior_graph(review_items)
+        graph_docs = self.kb.graph_to_documents(graph)
+        all_docs = kb_docs + dynamic_docs + graph_docs
         retrieved = self._retrieve(question=question, docs=all_docs, top_k=4)
 
         behavior_context = None
         if customer_id is not None:
             try:
-                behavior_context = self.behavior.predict_customer(customer_id=customer_id, reviews=reviews)
+                behavior_context = self.behavior.predict_customer(customer_id=customer_id, reviews=review_items)
             except Exception as exc:
                 behavior_context = {"found": False, "message": str(exc)}
 
@@ -208,5 +211,6 @@ class BehaviorRAGAdvisor:
                 for d in retrieved
             ],
             "behavior_context": behavior_context,
+            "graph_meta": graph.get("meta", {}),
             "model": "RAG-TFIDF+model_behavior",
         }

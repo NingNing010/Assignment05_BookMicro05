@@ -244,10 +244,6 @@
         </div>
         <div class="ai-body">
             <div class="ai-row">
-                <label for="customerId">Customer ID</label>
-                <input id="customerId" type="number" min="1" placeholder="Ví dụ: 1">
-            </div>
-            <div class="ai-row">
                 <label for="question">Câu hỏi tư vấn</label>
                 <textarea id="question" placeholder="Ví dụ: Tôi muốn mua 1 cuốn sách về AI thì nên chọn gì?"></textarea>
             </div>
@@ -295,7 +291,6 @@ function formatPrice(price) {
 }
 
 async function askAdvisor() {
-    const customerId = document.getElementById('customerId').value;
     const question = (document.getElementById('question').value || '').trim();
     if (!question) {
         alert('Vui lòng nhập câu hỏi.');
@@ -303,7 +298,10 @@ async function askAdvisor() {
     }
 
     const payload = {question};
-    if (customerId) payload.customer_id = Number(customerId);
+    const customer = getCustomer?.();
+    if (customer?.id) {
+        payload.customer_id = Number(customer.id);
+    }
 
     try {
         const res = await fetch('/api/proxy/reviews/rag/chat/', {

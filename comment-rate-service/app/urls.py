@@ -7,6 +7,8 @@ from .views import (
     BehaviorCustomerAnalyze,
     KnowledgeBaseList,
     KnowledgeBaseRebuild,
+    KnowledgeGraphView,
+    KnowledgeGraphRebuild,
     RAGBehaviorChat,
 )
 
@@ -18,11 +20,15 @@ urlpatterns = [
     path('behavior/customer/<int:customer_id>/', BehaviorCustomerAnalyze.as_view()),
     path('kb/', KnowledgeBaseList.as_view()),
     path('kb/rebuild/', KnowledgeBaseRebuild.as_view()),
+    path('kb/graph/', KnowledgeGraphView.as_view()),
+    path('kb/graph/rebuild/', KnowledgeGraphRebuild.as_view()),
     path('rag/chat/', RAGBehaviorChat.as_view()),
     # Aliases to support api-gateway /api/proxy/reviews/<path>
     path('reviews/behavior/train/', BehaviorModelTrain.as_view()),
     path('reviews/behavior/customer/<int:customer_id>/', BehaviorCustomerAnalyze.as_view()),
     path('reviews/kb/', KnowledgeBaseList.as_view()),
     path('reviews/kb/rebuild/', KnowledgeBaseRebuild.as_view()),
+    path('reviews/kb/graph/', KnowledgeGraphView.as_view()),
+    path('reviews/kb/graph/rebuild/', KnowledgeGraphRebuild.as_view()),
     path('reviews/rag/chat/', RAGBehaviorChat.as_view()),
 ]

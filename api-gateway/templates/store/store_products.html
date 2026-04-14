@@ -1,6 +1,6 @@
 {% extends "store/store_base.html" %}
-{% block title %}Tất cả sách{% endblock %}
-{% block nav_books %}active{% endblock %}
+{% block title %}Tất cả sản phẩm{% endblock %}
+{% block nav_products %}active{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -95,14 +95,14 @@
 <section class="section">
     <div class="section-header">
         <div>
-            <div class="section-title">📚 Tất cả sách</div>
+            <div class="section-title">🛍️ Tất cả sản phẩm</div>
             <div class="section-subtitle" id="bookCount">Đang tải...</div>
         </div>
     </div>
 
     <div class="filter-bar" id="filterBar">
         <button class="filter-chip active" onclick="filterCategory(null, this)">Tất cả</button>
-        <input class="search-input" id="searchInput" placeholder="Tìm theo tên sách, tác giả, mô tả..." oninput="applySort()">
+        <input class="search-input" id="searchInput" placeholder="Tìm theo tên sản phẩm, danh mục, mô tả..." oninput="applySort()">
         <select class="sort-select" id="sortSelect" onchange="applySort()">
             <option value="newest">Mới nhất</option>
             <option value="price-low">Giá thấp → cao</option>
@@ -128,11 +128,11 @@
 
     async function loadData() {
         try {
-            const [booksRes, catsRes] = await Promise.all([
-                fetch('/api/proxy/books/'),
+            const [productsRes, catsRes] = await Promise.all([
+                fetch('/api/proxy/products/'),
                 fetch('/api/proxy/categories/')
             ]);
-            allBooks = await booksRes.json();
+            allBooks = await productsRes.json();
             const categories = await catsRes.json();
 
             // Add category chips
@@ -167,41 +167,43 @@
         let books = currentFilter ? allBooks.filter(b => b.category_name === currentFilter) : [...allBooks];
         const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
         if (q) {
-            books = books.filter(b => [b.title, b.author, b.description].join(' ').toLowerCase().includes(q));
+            books = books.filter(b => [b.name, b.category_name, b.brand_name, b.description].join(' ').toLowerCase().includes(q));
         }
         const sort = document.getElementById('sortSelect').value;
         switch(sort) {
             case 'price-low': books.sort((a,b) => a.price - b.price); break;
             case 'price-high': books.sort((a,b) => b.price - a.price); break;
-            case 'name': books.sort((a,b) => a.title.localeCompare(b.title)); break;
+            case 'name': books.sort((a,b) => (a.name||a.title||'').localeCompare(b.name||b.title||'')); break;
             default: books.sort((a,b) => (b.id || 0) - (a.id || 0));
         }
         renderBooks(books);
     }
 
     function renderBooks(books) {
-        document.getElementById('bookCount').textContent = `${books.length} tựa sách`;
+        document.getElementById('bookCount').textContent = `${books.length} sản phẩm`;
         const grid = document.getElementById('booksGrid');
 
         if (books.length === 0) {
-            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📚</div><div class="empty-title">Không có sách nào</div></div>`;
+            grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🛍️</div><div class="empty-title">Không có sản phẩm nào</div></div>`;
             return;
         }
 
         grid.innerHTML = books.map((b, i) => {
             const stockClass = b.stock > 5 ? 'in-stock' : b.stock > 0 ? 'low-stock' : 'out-of-stock';
             const stockText = b.stock > 5 ? 'Còn hàng' : b.stock > 0 ? `Còn ${b.stock}` : 'Hết hàng';
+            const name = b.name || b.title;
+            const subtitle = b.brand_name ? `🏢 ${b.brand_name}` : (b.author ? `✍️ ${b.author}` : `📌 ${b.category_name||''}`);
             return `
-                <div class="book-card" onclick="openBookPopup(${b.id})">
+                <div class="book-card" onclick="window.location.href='/store/product/${b.id}/'">
                     <div class="book-card-cover ${gradClass(i)}">
-                        ${b.image_url ? `<img class="cover-media" src="${b.image_url}" alt="${b.title}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : ''}
-                        <div class="book-icon" style="display:${b.image_url ? 'none' : 'flex'}">📖</div>
+                        ${b.image_url ? `<img class="cover-media" src="${b.image_url}" alt="${name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : ''}
+                        <div class="book-icon" style="display:${b.image_url ? 'none' : 'flex'}">🛍️</div>
                         ${b.category_name ? `<span class="category-tag">${b.category_name}</span>` : ''}
                         <span class="stock-tag ${stockClass}">${stockText}</span>
                     </div>
                     <div class="book-card-body">
-                        <div class="book-card-title">${b.title}</div>
-                        <div class="book-card-author">✍️ ${b.author}</div>
+                        <div class="book-card-title" title="${name}">${name}</div>
+                        <div class="book-card-author">${subtitle}</div>
                         <div class="book-card-footer">
                             <div class="book-card-price">${formatPrice(b.price)} <span class="currency">₫</span></div>
                             <button class="btn-add-cart" ${b.stock < 1 ? 'disabled' : ''} onclick="event.stopPropagation();addToCart(${b.id})">${b.stock < 1 ? 'Hết hàng' : '🛒 Thêm'}</button>
@@ -212,37 +214,7 @@
     }
 
     async function openBookPopup(bookId) {
-        const popup = document.getElementById('bookPopup');
-        const content = document.getElementById('bookPopupContent');
-        popup.classList.add('show');
-        content.innerHTML = '<div class="spinner"></div>';
-        try {
-            const book = await apiCall(`/api/proxy/books/${bookId}/`);
-            const out = (book.stock || 0) < 1;
-            content.innerHTML = `
-                <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px">
-                    <div>
-                        <h3 style="font-size:1.25rem">${book.title}</h3>
-                        <div style="color:var(--text-muted);margin-top:4px">✍️ ${book.author}</div>
-                    </div>
-                    <button class="btn btn-outline btn-sm" onclick="closeBookPopup()">Đóng</button>
-                ${book.image_url ? `<img src="${book.image_url}" alt="${book.title}" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin-bottom:12px;">` : ''}
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-                    <div class="meta-item"><div class="meta-label">Giá</div><div class="meta-value">${formatPrice(book.price)} ₫</div></div>
-                    <div class="meta-item"><div class="meta-label">Tồn kho</div><div class="meta-value">${book.stock}</div></div>
-                    <div class="meta-item"><div class="meta-label">Danh mục</div><div class="meta-value">${book.category_name || '—'}</div></div>
-                    <div class="meta-item"><div class="meta-label">NXB</div><div class="meta-value">${book.publisher_name || '—'}</div></div>
-                </div>
-                <div style="font-size:0.9rem;color:var(--text-body);line-height:1.7">${book.description || 'Chưa có mô tả.'}</div>
-                <div style="display:flex;gap:10px;margin-top:16px">
-                    <button class="btn btn-primary" ${out ? 'disabled' : ''} onclick="addToCart(${book.id})">${out ? 'Hết hàng' : '🛒 Thêm vào giỏ'}</button>
-                    <a class="btn btn-outline" href="/store/book/${book.id}/">Xem trang chi tiết</a>
-                </div>
-            `;
-        } catch (e) {
-            content.innerHTML = `<div style="color:#c0392b">Không thể tải chi tiết sách: ${e.message}</div>`;
-        }
+        // Disabled popup logic as we direct users to the new tab details page.
     }
 
     function closeBookPopup() {
@@ -254,7 +226,7 @@
         if (!c) { window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname); return; }
         const book = (allBooks || []).find(b => Number(b.id) === Number(bookId));
         if (book && Number(book.stock || 0) < 1) {
-            showToast('Sách đã hết hàng, không thể thêm vào giỏ', 'error');
+            showToast('Sản phẩm đã hết hàng, không thể thêm vào giỏ', 'error');
             return;
         }
         try {

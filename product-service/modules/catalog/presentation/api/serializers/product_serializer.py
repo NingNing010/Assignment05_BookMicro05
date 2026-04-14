@@ -44,8 +44,11 @@ class ProductSerializer(serializers.ModelSerializer):
         return value
 
     def validate_price(self, value):
-        if value is not None and value <= 0:
-            raise serializers.ValidationError('Price must be > 0')
+        if value is not None:
+            if value <= 0:
+                raise serializers.ValidationError('Price must be > 0')
+            if value != int(value):
+                raise serializers.ValidationError('Price must be a whole VND amount')
         return value
 
 
@@ -84,8 +87,11 @@ class BookCompatSerializer(serializers.ModelSerializer):
         return value
 
     def validate_price(self, value):
-        if value is not None and value <= 0:
-            raise serializers.ValidationError('Price must be > 0')
+        if value is not None:
+            if value <= 0:
+                raise serializers.ValidationError('Price must be > 0')
+            if value != int(value):
+                raise serializers.ValidationError('Price must be a whole VND amount')
         return value
 
     def to_internal_value(self, data):

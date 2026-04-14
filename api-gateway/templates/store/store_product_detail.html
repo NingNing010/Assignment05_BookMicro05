@@ -1,16 +1,16 @@
 {% extends "store/store_base.html" %}
-{% block title %}{{ book_id }} — Chi tiết sách{% endblock %}
-{% block nav_books %}active{% endblock %}
+{% block title %}{{ product_id }} — Chi tiết sản phẩm{% endblock %}
+{% block nav_products %}active{% endblock %}
 
 {% block extra_css %}
 <style>
     .book-detail {
-        max-width: 1280px;
+        max-width: 1320px;
         margin: 0 auto;
-        padding: 40px;
+        padding: 36px 24px;
         display: grid;
-        grid-template-columns: 400px 1fr;
-        gap: 48px;
+        grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+        gap: 32px;
         align-items: start;
     }
 
@@ -20,13 +20,21 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 5rem;
+        font-size: 4.2rem;
         box-shadow: var(--shadow-lg);
         position: sticky;
-        top: 80px;
+        top: 84px;
+        overflow: hidden;
     }
 
-    .book-info { padding-top: 8px; }
+    .book-info {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 28px;
+        box-shadow: var(--shadow);
+        padding-top: 24px;
+    }
 
     .book-category-breadcrumb {
         display: inline-flex;
@@ -79,7 +87,7 @@
 
     .book-meta-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
         margin-bottom: 28px;
     }
@@ -215,8 +223,9 @@
     }
 
     @media (max-width: 768px) {
-        .book-detail { grid-template-columns: 1fr; padding: 20px; }
-        .book-cover-large { position: static; max-width: 300px; margin: 0 auto; }
+        .book-detail { grid-template-columns: 1fr; padding: 18px; }
+        .book-cover-large { position: static; max-width: 320px; margin: 0 auto; }
+        .book-info { padding: 22px; }
     }
 </style>
 {% endblock %}
@@ -229,38 +238,53 @@
 
 {% block scripts %}
 <script>
-    const RAW_BOOK_ID = Number('{{ book_id }}');
-    if (isClothesProductId(RAW_BOOK_ID)) {
-        window.location.href = `/store/clothes/${RAW_BOOK_ID}/`;
-    }
-    const BOOK_ID = decodeStoreProductId(RAW_BOOK_ID);
+    const PRODUCT_ID = Number('{{ product_id }}');
     let selectedRating = 5;
 
     async function loadBook() {
         try {
             const [book, reviewsRes] = await Promise.all([
-                apiCall(`/api/proxy/books/${BOOK_ID}/`),
-                fetch(`/api/proxy/reviews/book/${BOOK_ID}/`).then(r => r.ok ? r.json() : [])
+                apiCall(`/api/proxy/products/${PRODUCT_ID}/`),
+                fetch(`/api/proxy/reviews/book/${PRODUCT_ID}/`).then(r => r.ok ? r.json() : [])
             ]);
 
             const reviews = Array.isArray(reviewsRes) ? reviewsRes : [];
             const stockClass = book.stock > 5 ? 'in-stock' : book.stock > 0 ? 'low-stock' : 'out-of-stock';
-            const stockText = book.stock > 5 ? '✅ Còn hàng' : book.stock > 0 ? `⚠️ Chỉ còn ${book.stock} cuốn` : '❌ Hết hàng';
+            const stockText = book.stock > 5 ? '✅ Còn hàng' : book.stock > 0 ? `⚠️ Chỉ còn ${book.stock} sản phẩm` : '❌ Hết hàng';
             const stockColor = book.stock > 5 ? 'var(--green)' : book.stock > 0 ? 'var(--orange)' : 'var(--accent)';
-            const gradIdx = BOOK_ID % 6 + 1;
+            const gradIdx = PRODUCT_ID % 6 + 1;
+            
+            const name = book.name || book.title || 'Sản phẩm';
+            const subtitle = book.brand_name ? `🏢 ${book.brand_name}` : (book.author ? `✍️ ${book.author}` : `📌 ${book.category_name||''}`);
+
+            // Dynamic Attribute Rendering
+            let attributesHTML = '';
+            if (book.attributes && typeof book.attributes === 'object') {
+                for (const [key, val] of Object.entries(book.attributes)) {
+                    if (!val) continue;
+                    // Format key nicely (e.g., 'ram' -> 'RAM', 'skin_type' -> 'Skin Type')
+                    const formattedKey = key.replace(/_/g, ' ').replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.substr(1).toLowerCase());
+                    attributesHTML += `
+                        <div class="meta-item">
+                            <div class="meta-label">${formattedKey}</div>
+                            <div class="meta-value">${val}</div>
+                        </div>
+                    `;
+                }
+            }
 
             document.getElementById('bookDetail').innerHTML = `
                 <div class="book-cover-large grad-${gradIdx}">
-                    ${book.image_url ? `<img src="${book.image_url}" alt="${book.title || 'Book'}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : ''}
-                    <div style="display:${book.image_url ? 'none' : 'flex'};width:100%;height:100%;align-items:center;justify-content:center">📖</div>
+                    ${book.image_url ? `<img src="${book.image_url}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : ''}
+                    <div style="display:${book.image_url ? 'none' : 'flex'};width:100%;height:100%;align-items:center;justify-content:center">🛍️</div>
                 </div>
                 <div class="book-info">
                     <div class="book-category-breadcrumb">
-                        <a href="/store/">Trang chủ</a> › <a href="/store/books/">Sách</a>
+                        <a href="/store/">Trang chủ</a> › <a href="/store/products/">Sản phẩm</a>
                         ${book.category_name ? ` › <span>${book.category_name}</span>` : ''}
                     </div>
-                    <h1 class="book-title-large">${book.title}</h1>
-                    <div class="book-author-large">✍️ ${book.author}</div>
+                    <h1 class="book-title-large">${name}</h1>
+                    <div class="book-author-large">${subtitle}</div>
                     <div class="book-price-large">${formatPrice(book.price)} <span class="currency">₫</span></div>
                     <div class="book-stock-info">
                         <span class="tag ${stockClass === 'in-stock' ? 'tag-green' : stockClass === 'low-stock' ? 'tag-orange' : 'tag-red'}">${stockText}</span>
@@ -279,26 +303,23 @@
 
                     <div class="book-meta-grid">
                         <div class="meta-item">
-                            <div class="meta-label">ISBN</div>
-                            <div class="meta-value">${book.isbn || '—'}</div>
-                        </div>
-                        <div class="meta-item">
-                            <div class="meta-label">Nhà xuất bản</div>
-                            <div class="meta-value">${book.publisher_name || '—'}</div>
-                        </div>
-                        <div class="meta-item">
                             <div class="meta-label">Danh mục</div>
                             <div class="meta-value">${book.category_name || '—'}</div>
                         </div>
                         <div class="meta-item">
-                            <div class="meta-label">Kho</div>
-                            <div class="meta-value">${book.stock} cuốn</div>
+                            <div class="meta-label">Thương hiệu</div>
+                            <div class="meta-value">${book.brand_name || '—'}</div>
                         </div>
+                        <div class="meta-item">
+                            <div class="meta-label">Kho</div>
+                            <div class="meta-value">${book.stock}</div>
+                        </div>
+                        ${attributesHTML}
                     </div>
 
                     ${book.description ? `
                         <div class="book-description">
-                            <h3>📝 Mô tả</h3>
+                            <h3>📝 Mô tả chi tiết</h3>
                             <p>${book.description}</p>
                         </div>
                     ` : ''}
@@ -372,10 +393,10 @@
         try {
             await apiCall('/api/proxy/cart-items/', 'POST', {
                 customer_id: c.id,
-                book_id: BOOK_ID,
+                book_id: PRODUCT_ID,
                 quantity: qty
             });
-            showToast(`Đã thêm ${qty} cuốn vào giỏ hàng! 🛒`);
+            showToast(`Đã thêm ${qty} sản phẩm vào giỏ hàng! 🛒`);
             loadCartCount();
         } catch(e) {
             showToast('Lỗi: ' + e.message, 'error');
@@ -388,7 +409,7 @@
         const comment = document.getElementById('reviewComment').value.trim();
         try {
             await apiCall('/api/proxy/reviews/', 'POST', {
-                book_id: BOOK_ID,
+                book_id: PRODUCT_ID,
                 customer_id: c.id,
                 rating: selectedRating,
                 comment: comment

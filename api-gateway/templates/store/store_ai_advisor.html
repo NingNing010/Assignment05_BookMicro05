@@ -1,10 +1,10 @@
 {% extends 'store/store_base.html' %}
-{% block title %}AI Tư vấn hành vi - BookStore{% endblock %}
+{% block title %}AI Tư vấn sản phẩm{% endblock %}
 {% block nav_ai_advisor %}active{% endblock %}
 
 {% block extra_css %}
 .chat-wrap {
-    max-width: 980px;
+    max-width: 1080px;
     margin: 28px auto;
     padding: 0 20px 24px;
 }
@@ -15,94 +15,228 @@
     overflow: hidden;
 }
 .ai-head {
-    background: linear-gradient(135deg, #1f4e79 0%, #2f7fb6 100%);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     color: #fff;
-    padding: 18px 20px;
+    padding: 22px 24px;
 }
-.ai-head h2 {
-    margin: 0;
-    font-size: 1.15rem;
+.ai-head h2 { margin: 0; font-size: 1.2rem; }
+.ai-head p { margin: 6px 0 0; opacity: .88; font-size: .88rem; }
+
+.ai-arch-badges {
+    display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
 }
-.ai-head p {
-    margin: 6px 0 0;
-    opacity: .92;
-    font-size: .9rem;
-}
-.ai-body {
-    padding: 16px;
-}
-.ai-row {
-    display: grid;
-    grid-template-columns: 170px 1fr;
-    gap: 10px;
-    margin-bottom: 10px;
-    align-items: center;
-}
-.ai-row label {
+.ai-arch-badges span {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: .72rem;
     font-weight: 600;
-    color: #293241;
-}
-.ai-row input, .ai-row textarea {
-    width: 100%;
-    border: 1px solid #d9e2ec;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: .94rem;
-}
-.ai-row textarea {
-    min-height: 90px;
-    resize: vertical;
-}
-.ai-actions {
-    margin-top: 8px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-.ai-btn {
-    border: none;
-    border-radius: 10px;
-    padding: 10px 16px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.ai-btn.primary {
-    background: #2f7fb6;
+    background: rgba(255,255,255,0.15);
     color: #fff;
+    backdrop-filter: blur(4px);
 }
-.ai-btn.secondary {
-    background: #edf2f7;
-    color: #2d3748;
-}
-.ai-output {
-    margin-top: 16px;
+
+.ai-body { padding: 20px; }
+
+/* Chat messages */
+.chat-messages {
+    min-height: 120px;
+    max-height: 420px;
+    overflow-y: auto;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 14px;
     background: #f8fbff;
+    margin-bottom: 14px;
 }
-.ai-output pre {
+.chat-msg {
+    margin-bottom: 14px;
+    display: flex;
+    gap: 10px;
+}
+.chat-msg .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.chat-msg.user .avatar { background: #e3f2fd; }
+.chat-msg.ai .avatar { background: #f3e5f5; }
+.chat-msg .bubble {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: .9rem;
+    line-height: 1.55;
+    color: #1a202c;
+    max-width: 85%;
     white-space: pre-wrap;
     word-wrap: break-word;
-    margin: 0;
-    font-size: .92rem;
-    color: #1a202c;
 }
+.chat-msg.user .bubble { background: #e3f2fd; border-color: #bbdefb; }
+.chat-msg.ai .bubble { background: #fafafa; }
+.chat-msg .source-tag {
+    display: inline-block;
+    font-size: .7rem;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    font-weight: 600;
+}
+.source-vector { background: #e8f5e9; color: #2e7d32; }
+.source-graph { background: #fff3e0; color: #e65100; }
+.source-collab { background: #e3f2fd; color: #1565c0; }
 
+/* Input area */
+.chat-input-row {
+    display: flex;
+    gap: 10px;
+}
+.chat-input-row textarea {
+    flex: 1;
+    border: 1px solid #d9e2ec;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: .94rem;
+    resize: none;
+    min-height: 48px;
+    max-height: 100px;
+    font-family: inherit;
+}
+.chat-input-row textarea:focus {
+    outline: none;
+    border-color: #0f3460;
+}
+.send-btn {
+    border: none;
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    color: #fff;
+    border-radius: 12px;
+    padding: 0 20px;
+    font-weight: 600;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+.send-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.send-btn:disabled { opacity: 0.5; cursor: wait; }
+
+/* Product recommendations grid */
+.rec-section {
+    margin-top: 16px;
+    display: none;
+}
+.rec-section.show { display: block; }
+.rec-section h3 {
+    margin: 0 0 12px;
+    font-size: 1rem;
+    color: #1f2937;
+    font-weight: 600;
+}
+.rec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+.rec-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+.rec-card:hover {
+    border-color: #0f3460;
+    box-shadow: 0 4px 16px rgba(15, 52, 96, 0.12);
+    transform: translateY(-2px);
+}
+.rec-cover {
+    padding: 18px 14px;
+    text-align: center;
+    font-size: 2rem;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    position: relative;
+}
+.rec-cover .cat-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: .65rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.3);
+    color: #fff;
+    font-weight: 600;
+}
+.rec-info {
+    padding: 10px 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.rec-name {
+    font-weight: 600;
+    font-size: .85rem;
+    color: #1f2937;
+    margin-bottom: 4px;
+    line-height: 1.3;
+    flex: 1;
+}
+.rec-meta {
+    font-size: .75rem;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+.rec-price {
+    font-weight: 700;
+    color: #0f3460;
+    font-size: .9rem;
+    margin-bottom: 6px;
+}
+.rec-score {
+    font-size: .7rem;
+    color: #9ca3af;
+    margin-bottom: 6px;
+}
+.rec-action {
+    border: none;
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    color: #fff;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: .8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+.rec-action:hover { opacity: 0.85; }
+.rec-action:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Quick prompts */
 .quick-prompts {
-    margin-top: 14px;
+    margin-top: 16px;
     border-top: 1px solid #e2e8f0;
-    padding-top: 12px;
+    padding-top: 14px;
 }
 .quick-prompts h3 {
     margin: 0 0 10px;
-    font-size: 1rem;
+    font-size: .95rem;
     color: #1f2937;
 }
 .prompt-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
 }
 .prompt-card {
     border: 1px solid #d9e2ec;
@@ -113,125 +247,16 @@
     cursor: pointer;
     color: #1f2937;
     transition: all 0.2s;
-}
-.prompt-card:hover {
-    background: #f8fbff;
-    border-color: #2f7fb6;
-}
-.prompt-card strong {
-    display: block;
-    margin-bottom: 4px;
-}
-.prompt-card span {
-    font-size: .9rem;
-    color: #4b5563;
-}
-
-/* ── Book Recommendations Section ── */
-.recommendations-section {
-    margin-top: 18px;
-    border-top: 1px solid #e2e8f0;
-    padding-top: 14px;
-    display: none;
-}
-.recommendations-section.show {
-    display: block;
-}
-.recommendations-section h3 {
-    margin: 0 0 10px;
-    font-size: 1rem;
-    color: #1f2937;
-    font-weight: 600;
-}
-.book-recommendations-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-}
-.book-rec-card {
-    border: 1px solid #d9e2ec;
-    border-radius: 10px;
-    background: #fff;
-    overflow: hidden;
-    transition: all 0.2s;
-    display: flex;
-    flex-direction: column;
-}
-.book-rec-card:hover {
-    border-color: #2f7fb6;
-    box-shadow: 0 4px 12px rgba(47, 127, 182, 0.15);
-    transform: translateY(-2px);
-}
-.book-rec-cover {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 24px 16px;
-    text-align: center;
-    font-size: 2rem;
-    min-height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-}
-.book-rec-cover.cat-1 { background: linear-gradient(135deg, #e94560, #c0392b); }
-.book-rec-cover.cat-2 { background: linear-gradient(135deg, #3498db, #2980b9); }
-.book-rec-cover.cat-3 { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
-.book-rec-cover.cat-4 { background: linear-gradient(135deg, #f39c12, #e67e22); }
-.book-rec-info {
-    padding: 10px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-.book-rec-title {
-    font-weight: 600;
-    font-size: .9rem;
-    color: #1f2937;
-    margin-bottom: 4px;
-    line-height: 1.3;
-    flex: 1;
-}
-.book-rec-author {
-    font-size: .8rem;
-    color: #4b5563;
-    margin-bottom: 6px;
-}
-.book-rec-price {
-    font-weight: 600;
-    color: #2f7fb6;
-    font-size: .9rem;
-    margin-bottom: 6px;
-}
-.book-rec-action {
-    border: none;
-    background: #2f7fb6;
-    color: #fff;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: .85rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
     font-family: inherit;
+    font-size: .85rem;
 }
-.book-rec-action:hover {
-    background: #1e4e8f;
-}
-.book-rec-action:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+.prompt-card:hover { background: #f0f7ff; border-color: #0f3460; }
+.prompt-card strong { display: block; margin-bottom: 3px; font-size: .8rem; }
+.prompt-card span { font-size: .78rem; color: #4b5563; }
 
 @media (max-width: 720px) {
-    .ai-row {
-        grid-template-columns: 1fr;
-    }
-    .prompt-grid {
-        grid-template-columns: 1fr;
-    }
-    .book-recommendations-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    .rec-grid { grid-template-columns: repeat(2, 1fr); }
+    .prompt-grid { grid-template-columns: 1fr; }
 }
 {% endblock %}
 
@@ -239,45 +264,75 @@
 <div class="chat-wrap">
     <div class="ai-panel">
         <div class="ai-head">
-            <h2>AI Tư vấn hành vi khách hàng (RAG + Deep Learning)</h2>
-            <p>Sử dụng model_behavior và Knowledge Base để gợi ý chăm sóc, upsell, giữ chân khách hàng.</p>
+            <h2>🤖 AI Tư vấn Sản phẩm Thông minh</h2>
+            <p>Sử dụng Graph Knowledge Base, Vector Search (TF-IDF/FAISS) & RAG Pipeline để tư vấn sản phẩm</p>
+            <div class="ai-arch-badges">
+                <span>📊 Graph Knowledge Base</span>
+                <span>🔍 TF-IDF Vector Search</span>
+                <span>🧠 RAG Pipeline</span>
+                <span>👥 Collaborative Filtering</span>
+                <span>📈 Behavior Scoring</span>
+            </div>
         </div>
         <div class="ai-body">
-            <div class="ai-row">
-                <label for="question">Câu hỏi tư vấn</label>
-                <textarea id="question" placeholder="Ví dụ: Tôi muốn mua 1 cuốn sách về AI thì nên chọn gì?"></textarea>
-            </div>
-            <div class="ai-actions">
-                <button class="ai-btn primary" onclick="askAdvisor()">Hỏi AI tư vấn</button>
-            </div>
-
-            <div class="ai-output" id="outputBox" style="display:none;">
-                <pre id="outputText"></pre>
-            </div>
-
-            <div class="recommendations-section" id="recommendationsSection">
-                <h3>📚 Sách được đề xuất</h3>
-                <div class="book-recommendations-grid" id="bookRecommendationsGrid"></div>
+            <!-- Chat messages -->
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-msg ai">
+                    <div class="avatar">🤖</div>
+                    <div class="bubble">
+                        Xin chào! Tôi là AI Tư vấn sản phẩm. Tôi sử dụng <b>Graph Knowledge Base</b> để phân tích hành vi mua hàng và <b>Vector Search</b> để tìm sản phẩm phù hợp nhất cho bạn.<br><br>
+                        Hãy hỏi tôi về bất kỳ sản phẩm nào — từ Điện thoại, Laptop, Thời trang đến Mỹ phẩm, Nội thất, Nhạc cụ và nhiều hơn!
+                    </div>
+                </div>
             </div>
 
+            <!-- Input -->
+            <div class="chat-input-row">
+                <textarea id="questionInput" placeholder="Hỏi về sản phẩm... VD: Tôi muốn mua laptop gaming tầm 25 triệu" rows="1"></textarea>
+                <button class="send-btn" id="sendBtn" onclick="askAI()">Gửi ➤</button>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="rec-section" id="recSection">
+                <h3>🛍️ Sản phẩm được đề xuất</h3>
+                <div class="rec-grid" id="recGrid"></div>
+            </div>
+
+            <!-- Quick prompts -->
             <div class="quick-prompts">
-                <h3>Câu hỏi mẫu để ra câu trả lời khác nhau</h3>
+                <h3>💡 Câu hỏi gợi ý</h3>
                 <div class="prompt-grid">
-                    <button class="prompt-card" type="button" onclick="fillQuestion('Tôi ghét cuốn sách này và rất thất vọng, nên xử lý thế nào?')">
-                        <strong>1. Phàn nàn / tiêu cực</strong>
-                        <span>Tôi ghét cuốn sách này và rất thất vọng, nên xử lý thế nào?</span>
+                    <button class="prompt-card" type="button" onclick="fillQ('Tôi muốn mua một chiếc laptop để lập trình, nên chọn gì?')">
+                        <strong>💻 Mua laptop</strong>
+                        <span>Laptop lập trình, nên chọn gì?</span>
                     </button>
-                    <button class="prompt-card" type="button" onclick="fillQuestion('Tôi muốn mua 1 cuốn sách về AI, nên chọn gì?')">
-                        <strong>2. Mua sách / gợi ý</strong>
-                        <span>Tôi muốn mua 1 cuốn sách về AI, nên chọn gì?</span>
+                    <button class="prompt-card" type="button" onclick="fillQ('Gợi ý điện thoại tầm giá 10 triệu')">
+                        <strong>📱 Điện thoại</strong>
+                        <span>Điện thoại tầm giá 10 triệu</span>
                     </button>
-                    <button class="prompt-card" type="button" onclick="fillQuestion('Tôi thích cuốn sách này, có nên mua thêm sách cùng chủ đề không?')">
-                        <strong>3. Tích cực / upsell nhẹ</strong>
-                        <span>Tôi thích cuốn sách này, có nên mua thêm sách cùng chủ đề không?</span>
+                    <button class="prompt-card" type="button" onclick="fillQ('Tôi muốn mua mỹ phẩm dưỡng da tốt')">
+                        <strong>💄 Mỹ phẩm</strong>
+                        <span>Mỹ phẩm dưỡng da tốt</span>
                     </button>
-                    <button class="prompt-card" type="button" onclick="fillQuestion('Khách hàng này cần tư vấn gì cho phù hợp?')">
-                        <strong>4. Câu hỏi chung</strong>
-                        <span>Khách hàng này cần tư vấn gì cho phù hợp?</span>
+                    <button class="prompt-card" type="button" onclick="fillQ('So sánh các loại đồng hồ thông minh')">
+                        <strong>⌚ So sánh</strong>
+                        <span>So sánh đồng hồ thông minh</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQ('Tôi không hài lòng với sản phẩm này, nên làm gì?')">
+                        <strong>😤 Phàn nàn</strong>
+                        <span>Không hài lòng, nên xử lý thế nào?</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQ('Gợi ý sách hay về lập trình và AI')">
+                        <strong>📚 Sách</strong>
+                        <span>Sách hay về lập trình và AI</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQ('Tôi thích sản phẩm này, có thêm sản phẩm tương tự không?')">
+                        <strong>😍 Tích cực</strong>
+                        <span>Thích sản phẩm, gợi ý thêm</span>
+                    </button>
+                    <button class="prompt-card" type="button" onclick="fillQ('Tôi cần mua nội thất cho phòng ngủ mới')">
+                        <strong>🏠 Nội thất</strong>
+                        <span>Nội thất phòng ngủ mới</span>
                     </button>
                 </div>
             </div>
@@ -286,21 +341,74 @@
 </div>
 
 <script>
-function formatPrice(price) {
-    return (price || 0).toLocaleString('vi-VN');
+const CATEGORY_ICONS = {
+    'Dien thoai thong minh': '📱', 'May tinh xach tay': '💻', 'Sach Khoa hoc': '📚',
+    'Sach Lap trinh': '📚', 'Thoi trang Nam': '👔', 'Thoi trang The thao': '👟',
+    'My pham': '💄', 'Noi that': '🏠', 'Do choi': '🧸', 'May anh': '📷',
+    'Dong ho thong minh': '⌚', 'Nhac cu': '🎸', 'Thuc pham': '🍜',
+    'Do dien gia dung': '🔌', 'Phu kien cong nghe': '🔧', 'Giay dep': '👟',
+    'Tui xach': '👜',
+};
+const CATEGORY_COLORS = [
+    'linear-gradient(135deg, #e94560, #c0392b)',
+    'linear-gradient(135deg, #3498db, #2980b9)',
+    'linear-gradient(135deg, #9b59b6, #8e44ad)',
+    'linear-gradient(135deg, #f39c12, #e67e22)',
+    'linear-gradient(135deg, #2ecc71, #27ae60)',
+    'linear-gradient(135deg, #e74c3c, #c0392b)',
+    'linear-gradient(135deg, #1abc9c, #16a085)',
+    'linear-gradient(135deg, #34495e, #2c3e50)',
+];
+const SOURCE_LABELS = {
+    'vector_search': ['🔍 Vector', 'source-vector'],
+    'graph_user_history': ['📊 Graph', 'source-graph'],
+    'graph_collaborative': ['👥 Collab', 'source-collab'],
+};
+
+function formatPrice(p) { return Number(p || 0).toLocaleString('vi-VN'); }
+
+function getCustomer() {
+    const d = localStorage.getItem('store_customer');
+    return d ? JSON.parse(d) : null;
 }
 
-async function askAdvisor() {
-    const question = (document.getElementById('question').value || '').trim();
-    if (!question) {
-        alert('Vui lòng nhập câu hỏi.');
-        return;
-    }
+function fillQ(text) {
+    document.getElementById('questionInput').value = text;
+    document.getElementById('questionInput').focus();
+}
 
-    const payload = {question};
-    const customer = getCustomer?.();
+function addMessage(role, html) {
+    const container = document.getElementById('chatMessages');
+    const icon = role === 'user' ? '🧑' : '🤖';
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role}`;
+    div.innerHTML = `<div class="avatar">${icon}</div><div class="bubble">${html}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+async function askAI() {
+    const input = document.getElementById('questionInput');
+    const question = (input.value || '').trim();
+    if (!question) return;
+
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    input.value = '';
+
+    addMessage('user', question);
+
+    const payload = { question };
+    const customer = getCustomer();
+    if (customer?.id) payload.customer_id = Number(customer.id);
+
+    // Track the search interaction
     if (customer?.id) {
-        payload.customer_id = Number(customer.id);
+        fetch('/api/track/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: customer.id, event_type: 'search', query: question })
+        }).catch(() => {});
     }
 
     try {
@@ -310,61 +418,78 @@ async function askAdvisor() {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        showResult(data.answer || data.error || 'Chưa có câu trả lời.', data.recommended_books || []);
+
+        const answer = (data.answer || data.error || 'Chưa có câu trả lời.').replace(/\n/g, '<br>');
+        let extra = '';
+        if (data.retrieval_count) {
+            extra += `<br><span style="font-size:.75rem;color:#9ca3af;">📊 Retrieved: ${data.retrieval_count} products from Graph+Vector</span>`;
+        }
+        addMessage('ai', answer + extra);
+
+        const products = data.recommended_books || data.recommended_products || [];
+        showRecommendations(products);
     } catch (e) {
-        showResult(`Lỗi tư vấn: ${e.message}`, []);
+        addMessage('ai', `❌ Lỗi: ${e.message}`);
     }
+    btn.disabled = false;
 }
 
-function showResult(text, recommendedBooks) {
-    const box = document.getElementById('outputBox');
-    const out = document.getElementById('outputText');
-    box.style.display = 'block';
-    out.textContent = text;
-
-    // Show recommendations if available
-    const recSection = document.getElementById('recommendationsSection');
-    if (recommendedBooks && recommendedBooks.length > 0) {
-        recSection.classList.add('show');
-        renderRecommendations(recommendedBooks);
-    } else {
-        recSection.classList.remove('show');
+function showRecommendations(products) {
+    const section = document.getElementById('recSection');
+    const grid = document.getElementById('recGrid');
+    if (!products || !products.length) {
+        section.classList.remove('show');
+        return;
     }
-}
+    section.classList.add('show');
+    grid.innerHTML = products.map((p, idx) => {
+        const icon = CATEGORY_ICONS[p.category_name] || '📦';
+        const bg = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+        const sourceInfo = SOURCE_LABELS[p.retrieval_source] || ['📦', ''];
+        const outOfStock = (p.stock || 0) < 1;
+        const attrs = p.attributes || {};
+        const attrHtml = Object.entries(attrs).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(' · ');
 
-function renderRecommendations(books) {
-    const grid = document.getElementById('bookRecommendationsGrid');
-    const colors = ['cat-1', 'cat-2', 'cat-3', 'cat-4'];
-    
-    grid.innerHTML = books.map((book, idx) => {
-        const colorClass = colors[idx % colors.length];
-        const stockText = book.stock > 5 ? 'Còn hàng' : book.stock > 0 ? `Còn ${book.stock}` : 'Hết hàng';
-        const isOutOfStock = book.stock < 1;
-        
         return `
-            <div class="book-rec-card">
-                <div class="book-rec-cover ${colorClass}">📖</div>
-                <div class="book-rec-info">
-                    <div class="book-rec-title">${book.title}</div>
-                    <div class="book-rec-author">✍️ ${book.author}</div>
-                    <div class="book-rec-price">${formatPrice(book.price)} ₫</div>
-                    <button class="book-rec-action" ${isOutOfStock ? 'disabled' : ''} onclick="addToCart(${book.id})">${isOutOfStock ? 'Hết hàng' : '🛒 Thêm'}</button>
+            <div class="rec-card">
+                <div class="rec-cover" style="background:${bg};">
+                    <span style="font-size:2.2rem;">${icon}</span>
+                    <span class="cat-badge">${p.category_name || 'N/A'}</span>
+                </div>
+                <div class="rec-info">
+                    <div class="rec-name">${p.name || p.title}</div>
+                    <div class="rec-meta">${p.brand_name || ''}${attrHtml ? ' · ' + attrHtml : ''}</div>
+                    <div class="rec-price">${formatPrice(p.price)} ₫</div>
+                    <div class="rec-score">
+                        Score: ${p.relevance_score || '—'}
+                        <span class="${sourceInfo[1]}" style="font-size:.65rem;padding:1px 6px;border-radius:8px;margin-left:4px;">${sourceInfo[0]}</span>
+                    </div>
+                    <button class="rec-action" ${outOfStock ? 'disabled' : ''} onclick="addToCart(${p.id})">
+                        ${outOfStock ? 'Hết hàng' : '🛒 Thêm vào giỏ'}
+                    </button>
                 </div>
             </div>`;
     }).join('');
 }
 
-async function addToCart(bookId) {
-    const c = getCustomer?.();
+async function addToCart(productId) {
+    const c = getCustomer();
     if (!c) {
         window.location.href = '/store/login/?next=' + encodeURIComponent(window.location.pathname);
         return;
     }
+    // Track cart interaction
+    fetch('/api/track/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_id: c.id, product_id: productId, event_type: 'cart' })
+    }).catch(() => {});
+
     try {
         await fetch('/api/proxy/cart-items/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ customer_id: c.id, book_id: bookId, quantity: 1 })
+            body: JSON.stringify({ customer_id: c.id, book_id: productId, quantity: 1 })
         });
         alert('Đã thêm vào giỏ hàng! 🛒');
     } catch(e) {
@@ -372,14 +497,12 @@ async function addToCart(bookId) {
     }
 }
 
-function fillQuestion(text) {
-    document.getElementById('question').value = text;
-    document.getElementById('question').focus();
-}
-
-function getCustomer() {
-    const data = localStorage.getItem('store_customer');
-    return data ? JSON.parse(data) : null;
-}
+// Enter to send
+document.getElementById('questionInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        askAI();
+    }
+});
 </script>
 {% endblock %}

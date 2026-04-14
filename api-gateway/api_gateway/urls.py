@@ -8,10 +8,8 @@ urlpatterns = [
     # ── Customer-facing Store (homepage) ──
     path('', views.store_home, name='store_home'),
     path('store/', views.store_home, name='store_home_alt'),
-    path('store/books/', views.store_books, name='store_books'),
-    path('store/book/<int:book_id>/', views.store_book_detail, name='store_book_detail'),
-    path('store/clothes/', views.store_clothes, name='store_clothes'),
-    path('store/clothes/<int:clothes_id>/', views.store_clothes_detail, name='store_clothes_detail'),
+    path('store/products/', views.store_products, name='store_products'),
+    path('store/product/<int:product_id>/', views.store_product_detail, name='store_product_detail'),
     path('store/cart/', views.store_cart, name='store_cart'),
     path('store/orders/', views.store_orders, name='store_orders'),
     path('store/reviews/', views.store_reviews, name='store_reviews'),
@@ -22,8 +20,9 @@ urlpatterns = [
 
     # ── Admin Panel ──
     path('admin-panel/', views.dashboard, name='dashboard'),
-    path('admin-panel/books/', views.book_list, name='book_list'),
-    path('admin-panel/clothes/', views.clothes_list, name='clothes_list'),
+    path('admin-panel/products/', views.product_list, name='product_list'),
+    path('admin-panel/books/', views.product_list, name='book_list'),
+    path('admin-panel/clothes/', views.product_list, name='clothes_list'),
     path('admin-panel/accounts/', views.account_list, name='account_list'),
     path('admin-panel/publishers/', views.publisher_list, name='publisher_list'),
     path('admin-panel/cart/<int:customer_id>/', views.view_cart, name='view_cart'),
@@ -39,6 +38,10 @@ urlpatterns = [
 
     path('api/agent/chat/', views.agent_chat_api, name='agent_chat_api'),
     path('api/agent/help/', views.agent_help_api, name='agent_help_api'),
+
+    # ── AI Service APIs ──
+    path('api/track/', views.track_interaction, name='track_interaction'),
+    path('api/ai/recommend/<int:customer_id>/', views.ai_recommend, name='ai_recommend'),
 
     # Generic API Proxy for frontend CRUD
     path('api/proxy/<str:service>/', views.api_proxy, name='api_proxy'),

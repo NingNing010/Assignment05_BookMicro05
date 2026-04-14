@@ -49,7 +49,7 @@
         <div class="form-row">
             <div class="form-group">
                 <label>Price *</label>
-                <input class="form-control" id="fPrice" type="number" step="0.01" placeholder="29.99">
+                <input class="form-control" id="fPrice" type="number" step="1000" min="0" placeholder="18.000.000">
             </div>
             <div class="form-group">
                 <label>Stock *</label>
@@ -63,7 +63,7 @@
             </div>
             <div class="form-group">
                 <label>Image URL</label>
-                <input class="form-control" id="fImageUrl" placeholder="https://...">
+                <textarea class="form-control" id="fImageUrl" rows="2" style="resize:vertical;font-family:inherit;" placeholder="https://..."></textarea>
             </div>
         </div>
         <div class="form-row">
@@ -127,7 +127,7 @@ async function loadData() {
                 <td>${b.author}</td>
                 <td>${b.image_url ? '<a href="' + b.image_url + '" target="_blank" rel="noopener">Link</a>' : '-'}</td>
                 <td>${b.isbn || '-'}</td>
-                <td><span class="tag tag-green">$${b.price}</span></td>
+                <td><span class="tag tag-green">${Number(b.price || 0).toLocaleString('vi-VN')} ₫</span></td>
                 <td>${b.stock}</td>
                 <td>${b.category_name ? '<span class="tag tag-blue">' + b.category_name + '</span>' : '-'}</td>
                 <td>${b.publisher_name ? '<span class="tag tag-purple">' + b.publisher_name + '</span>' : '-'}</td>

@@ -5,21 +5,20 @@ from .serializers import RecommendationSerializer
 import requests
 import random
 
-BOOK_SERVICE_URL = "http://book-service:8000"
+PRODUCT_SERVICE_URL = "http://product-service:8000"
 COMMENT_RATE_SERVICE_URL = "http://comment-rate-service:8000"
 
 
 class RecommendationForCustomer(APIView):
-    """Get AI-based recommendations for a customer"""
+    """Get AI-based recommendations for a customer using unified product-service"""
 
     def get(self, request, customer_id):
-        # Simple recommendation: fetch all books and reviews,
-        # recommend top-rated books the customer hasn't reviewed
+        # Fetch all products from unified product-service
         try:
-            books_r = requests.get(f"{BOOK_SERVICE_URL}/books/")
-            books = books_r.json()
+            products_r = requests.get(f"{PRODUCT_SERVICE_URL}/products/")
+            products = products_r.json()
         except Exception:
-            books = []
+            products = []
 
         try:
             reviews_r = requests.get(f"{COMMENT_RATE_SERVICE_URL}/reviews/")
@@ -27,36 +26,40 @@ class RecommendationForCustomer(APIView):
         except Exception:
             reviews = []
 
-        # Books already reviewed by customer
-        reviewed_book_ids = {
-            r['book_id'] for r in reviews if r.get('customer_id') == customer_id
+        # Products already reviewed by customer
+        reviewed_product_ids = {
+            r.get('book_id') or r.get('product_id')
+            for r in reviews if r.get('customer_id') == customer_id
         }
 
-        # Calculate average rating per book
-        book_ratings = {}
+        # Calculate average rating per product
+        product_ratings = {}
         for review in reviews:
-            bid = review.get('book_id')
-            if bid not in book_ratings:
-                book_ratings[bid] = []
-            book_ratings[bid].append(review.get('rating', 0))
+            pid = review.get('book_id') or review.get('product_id')
+            if pid not in product_ratings:
+                product_ratings[pid] = []
+            product_ratings[pid].append(review.get('rating', 0))
 
         recommendations = []
-        for book in books:
-            if book['id'] not in reviewed_book_ids:
+        for product in products:
+            pid = product['id']
+            if pid not in reviewed_product_ids and product.get('stock', 0) > 0:
                 avg_rating = 0
-                if book['id'] in book_ratings:
-                    ratings = book_ratings[book['id']]
+                if pid in product_ratings:
+                    ratings = product_ratings[pid]
                     avg_rating = sum(ratings) / len(ratings)
-                score = avg_rating + random.uniform(0, 1)  # Add randomness
+                score = avg_rating + random.uniform(0, 1)
                 recommendations.append({
-                    "book_id": book['id'],
-                    "title": book.get('title', ''),
+                    "product_id": pid,
+                    "name": product.get('name', ''),
+                    "category": product.get('category_name', ''),
+                    "price": float(product.get('price', 0)),
                     "score": round(score, 2),
                 })
 
-        # Sort by score descending, return top 5
+        # Sort by score descending, return top 10
         recommendations.sort(key=lambda x: x['score'], reverse=True)
-        return Response(recommendations[:5])
+        return Response(recommendations[:10])
 
 
 class RecommendationList(APIView):

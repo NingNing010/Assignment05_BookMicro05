@@ -17,8 +17,8 @@ except Exception:
 PAY_SERVICE_URL = "http://pay-service:8000"
 SHIP_SERVICE_URL = "http://ship-service:8000"
 CART_SERVICE_URL = "http://cart-service:8000"
-BOOK_SERVICE_URL = "http://book-service:8000"
-CLOTHES_SERVICE_URL = "http://clothes-service:8000"
+BOOK_SERVICE_URL = "http://product-service:8000"
+CLOTHES_SERVICE_URL = "http://product-service:8000"
 CLOTHES_PRODUCT_ID_OFFSET = 100000
 EVENT_BUS_URL = os.getenv("EVENT_BUS_URL", "")
 RABBITMQ_ENABLED = os.getenv("RABBITMQ_ENABLED", "false").lower() == "true"
@@ -348,10 +348,7 @@ class OrderListCreate(APIView):
             new_stock = max(0, current_stock - quantity)
             try:
                 _, real_id = _resolve_product_reference(book_id)
-                if product_type == "clothes":
-                    requests.patch(f"{CLOTHES_SERVICE_URL}/clothes/{real_id}/", json={"stock": new_stock}, timeout=8)
-                else:
-                    requests.patch(f"{BOOK_SERVICE_URL}/books/{real_id}/", json={"stock": new_stock}, timeout=8)
+                requests.patch(f"http://product-service:8000/api/{product_type}s/{real_id}/", json={"stock": new_stock}, timeout=8)
             except Exception as e:
                 stock_update_errors.append({"book_id": book_id, "reason": str(e)})
 

@@ -44,10 +44,10 @@
             <div class="form-group"><label>Color</label><input class="form-control" id="fColor" placeholder="Black"></div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Price *</label><input class="form-control" id="fPrice" type="number" step="0.01" placeholder="199000"></div>
+            <div class="form-group"><label>Price *</label><input class="form-control" id="fPrice" type="number" step="1000" min="0" placeholder="1.890.000"></div>
             <div class="form-group"><label>Stock *</label><input class="form-control" id="fStock" type="number" min="1" step="1" placeholder="100"></div>
         </div>
-        <div class="form-group"><label>Image URL</label><input class="form-control" id="fImageUrl" placeholder="https://..."></div>
+        <div class="form-group"><label>Image URL</label><textarea class="form-control" id="fImageUrl" rows="2" style="resize:vertical;font-family:inherit;" placeholder="https://..."></textarea></div>
         <div class="form-group"><label>Description</label><textarea class="form-control" id="fDescription" rows="3" placeholder="Product description..."></textarea></div>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
@@ -78,7 +78,7 @@ async function loadData() {
                 <td>${c.size || '-'}</td>
                 <td>${c.color || '-'}</td>
                 <td>${c.image_url ? '<a href="' + c.image_url + '" target="_blank" rel="noopener">Link</a>' : '-'}</td>
-                <td><span class="tag tag-green">${Number(c.price || 0).toLocaleString('vi-VN')} VND</span></td>
+                <td><span class="tag tag-green">${Number(c.price || 0).toLocaleString('vi-VN')} ₫</span></td>
                 <td>${c.stock}</td>
                 <td>
                     <button class="btn btn-sm btn-blue" onclick='editClothes(${JSON.stringify(c)})'>Edit</button>

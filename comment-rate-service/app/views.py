@@ -8,8 +8,8 @@ from .model_behavior import BehaviorModelService
 from .knowledge_base import KnowledgeBaseManager
 from .rag_advisor import BehaviorRAGAdvisor
 
-BOOK_SERVICE_URL = "http://book-service:8000"
-CLOTHES_SERVICE_URL = "http://clothes-service:8000"
+BOOK_SERVICE_URL = "http://product-service:8000"
+CLOTHES_SERVICE_URL = "http://product-service:8000"
 CLOTHES_PRODUCT_ID_OFFSET = 100000
 behavior_service = BehaviorModelService()
 kb_manager = KnowledgeBaseManager()

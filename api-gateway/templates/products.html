@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% block title %}Products{% endblock %}
+{% block nav_products %}active{% endblock %}
+{% block page_title %}🛍️ Products{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openAddModal()">+ Thêm sản phẩm</button>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card" style="padding:16px 20px;">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="searchInput" class="form-control" placeholder="Tìm theo tên..." style="max-width:260px;" oninput="applyFilters()">
+        <select id="categoryFilter" class="form-control" style="max-width:200px;" onchange="applyFilters()">
+            <option value="">Tất cả danh mục</option>
+        </select>
+        <select id="brandFilter" class="form-control" style="max-width:180px;" onchange="applyFilters()">
+            <option value="">Tất cả thương hiệu</option>
+        </select>
+        <span id="productCount" style="margin-left:auto;color:var(--text-secondary);font-size:.85rem;"></span>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tên sản phẩm</th>
+                    <th>Danh mục</th>
+                    <th>Thương hiệu</th>
+                    <th>Giá</th>
+                    <th>Tồn kho</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="productTableBody">
+                <tr><td colspan="7" class="empty-state"><p>Đang tải...</p></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="productModal">
+    <div class="modal" style="max-width:620px;">
+        <h3 id="modalTitle">Thêm sản phẩm</h3>
+        <input type="hidden" id="editId">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Tên sản phẩm *</label>
+                <input type="text" id="fName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Giá *</label>
+                <input type="number" step="1000" min="0" id="fPrice" class="form-control" placeholder="18.000.000" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Danh mục</label>
+                <select id="fCategory" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label>Thương hiệu</label>
+                <select id="fBrand" class="form-control"></select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Tồn kho</label>
+                <input type="number" id="fStock" class="form-control" value="0">
+            </div>
+            <div class="form-group">
+                <label>Image URL</label>
+                <textarea id="fImage" class="form-control" rows="2" style="resize:vertical;font-family:inherit;"></textarea>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Mô tả</label>
+            <textarea id="fDesc" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Attributes (JSON)</label>
+            <textarea id="fAttrs" class="form-control" rows="2" placeholder='{"ram":"8GB","cpu":"i7"}'></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal()">Hủy</button>
+            <button class="btn btn-primary" onclick="saveProduct()">Lưu</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allProducts = [];
+let categories = [];
+let brands = [];
+
+async function loadData() {
+    try {
+        const [pRes, cRes, bRes] = await Promise.all([
+            fetch('/api/proxy/products/'),
+            fetch('/api/proxy/categories/'),
+            fetch('/api/proxy/brands/')
+        ]);
+        allProducts = await pRes.json();
+        categories = (await cRes.json()) || [];
+        brands = (await bRes.json()) || [];
+
+        // Populate filter dropdowns
+        const catFilter = document.getElementById('categoryFilter');
+        const brandFilter = document.getElementById('brandFilter');
+        categories.forEach(c => {
+            catFilter.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+        });
+        brands.forEach(b => {
+            brandFilter.innerHTML += `<option value="${b.name}">${b.name}</option>`;
+        });
+
+        // Populate form dropdowns
+        const fCat = document.getElementById('fCategory');
+        const fBrand = document.getElementById('fBrand');
+        fCat.innerHTML = '<option value="">-- Chọn --</option>';
+        fBrand.innerHTML = '<option value="">-- Chọn --</option>';
+        categories.forEach(c => {
+            fCat.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+        brands.forEach(b => {
+            fBrand.innerHTML += `<option value="${b.id}">${b.name}</option>`;
+        });
+
+        applyFilters();
+    } catch(e) {
+        document.getElementById('productTableBody').innerHTML =
+            `<tr><td colspan="7" class="empty-state"><p>Lỗi tải dữ liệu: ${e.message}</p></td></tr>`;
+    }
+}
+
+function applyFilters() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const cat = document.getElementById('categoryFilter').value;
+    const brand = document.getElementById('brandFilter').value;
+
+    let filtered = allProducts.filter(p => {
+        if (search && !p.name.toLowerCase().includes(search)) return false;
+        if (cat && (p.category_name || '') !== cat) return false;
+        if (brand && (p.brand_name || '') !== brand) return false;
+        return true;
+    });
+
+    document.getElementById('productCount').textContent = `${filtered.length} sản phẩm`;
+    renderTable(filtered);
+}
+
+function renderTable(products) {
+    const tbody = document.getElementById('productTableBody');
+    if (!products.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><p>Không có sản phẩm nào.</p></td></tr>';
+        return;
+    }
+    tbody.innerHTML = products.map(p => `
+        <tr>
+            <td>#${p.id}</td>
+            <td style="color:var(--text-primary);font-weight:500;">${p.name}</td>
+            <td><span class="tag tag-blue">${p.category_name || '—'}</span></td>
+            <td>${p.brand_name || '—'}</td>
+            <td style="font-weight:600;color:var(--accent-green);">${Number(p.price || 0).toLocaleString('vi-VN')} ₫</td>
+            <td>
+                <span class="tag ${p.stock > 10 ? 'tag-green' : p.stock > 0 ? 'tag-orange' : 'tag-red'}">
+                    ${p.stock > 0 ? p.stock : 'Hết hàng'}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-blue" onclick="editProduct(${p.id})">✏️</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openAddModal() {
+    document.getElementById('modalTitle').textContent = 'Thêm sản phẩm mới';
+    document.getElementById('editId').value = '';
+    document.getElementById('fName').value = '';
+    document.getElementById('fPrice').value = '';
+    document.getElementById('fStock').value = '0';
+    document.getElementById('fImage').value = '';
+    document.getElementById('fDesc').value = '';
+    document.getElementById('fAttrs').value = '';
+    document.getElementById('fCategory').value = '';
+    document.getElementById('fBrand').value = '';
+    document.getElementById('productModal').classList.add('show');
+}
+
+function editProduct(id) {
+    const p = allProducts.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('modalTitle').textContent = 'Sửa sản phẩm #' + id;
+    document.getElementById('editId').value = id;
+    document.getElementById('fName').value = p.name || '';
+    document.getElementById('fPrice').value = p.price || '';
+    document.getElementById('fStock').value = p.stock || 0;
+    document.getElementById('fImage').value = p.image_url || '';
+    document.getElementById('fDesc').value = p.description || '';
+    document.getElementById('fAttrs').value = p.attributes ? JSON.stringify(p.attributes) : '';
+    document.getElementById('fCategory').value = p.category || '';
+    document.getElementById('fBrand').value = p.brand || '';
+    document.getElementById('productModal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('productModal').classList.remove('show');
+}
+
+async function saveProduct() {
+    const id = document.getElementById('editId').value;
+    const body = {
+        name: document.getElementById('fName').value,
+        price: document.getElementById('fPrice').value,
+        stock: parseInt(document.getElementById('fStock').value) || 0,
+        image_url: document.getElementById('fImage').value,
+        description: document.getElementById('fDesc').value,
+        category: document.getElementById('fCategory').value || null,
+        brand: document.getElementById('fBrand').value || null,
+    };
+    try {
+        const attrs = document.getElementById('fAttrs').value;
+        if (attrs) body.attributes = JSON.parse(attrs);
+    } catch(e) {}
+
+    const url = id ? `/api/proxy/products/${id}/` : '/api/proxy/products/';
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (res.ok) {
+            closeModal();
+            showToast(id ? 'Cập nhật thành công!' : 'Thêm thành công!');
+            loadData();
+        } else {
+            const err = await res.json();
+            showToast('Lỗi: ' + JSON.stringify(err), 'error');
+        }
+    } catch(e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+async function deleteProduct(id) {
+    if (!confirm('Xác nhận xóa sản phẩm #' + id + '?')) return;
+    try {
+        const res = await fetch(`/api/proxy/products/${id}/`, {method: 'DELETE'});
+        if (res.ok || res.status === 204) {
+            showToast('Đã xóa!');
+            loadData();
+        } else {
+            showToast('Lỗi xóa sản phẩm', 'error');
+        }
+    } catch(e) {
+        showToast('Lỗi: ' + e.message, 'error');
+    }
+}
+
+loadData();
+</script>
+{% endblock %}

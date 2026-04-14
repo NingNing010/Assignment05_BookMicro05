@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 # Service URLs (Docker internal network)
 # ──────────────────────────────────────────────
-BOOK_SERVICE_URL = "http://book-service:8000"
+BOOK_SERVICE_URL = "http://product-service:8000"
 CART_SERVICE_URL = "http://cart-service:8000"
 ORDER_SERVICE_URL = "http://order-service:8000"
 COMMENT_RATE_SERVICE_URL = "http://comment-rate-service:8000"

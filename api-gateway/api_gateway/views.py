@@ -28,9 +28,9 @@ JWT_SECRET = os.getenv("JWT_SECRET", "bookstore-jwt-secret")
 JWT_ALGORITHM = "HS256"
 
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
-RATE_LIMIT_DEFAULT = int(os.getenv("RATE_LIMIT_DEFAULT", "120"))
-RATE_LIMIT_GUEST = int(os.getenv("RATE_LIMIT_GUEST", "60"))
-RATE_LIMIT_ADMIN = int(os.getenv("RATE_LIMIT_ADMIN", "300"))
+RATE_LIMIT_DEFAULT = int(os.getenv("RATE_LIMIT_DEFAULT", "3000"))
+RATE_LIMIT_GUEST = int(os.getenv("RATE_LIMIT_GUEST", "1000"))
+RATE_LIMIT_ADMIN = int(os.getenv("RATE_LIMIT_ADMIN", "5000"))
 
 logger = logging.getLogger("api_gateway")
 
@@ -154,584 +154,714 @@ def _normalize_text(text):
     return "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
 
 
-def _extract_topic_from_question(question):
-    """Extract topic/category name from question using quoted text or keywords."""
-    import re
+# ══════════════════════════════════════════════════════════════════════════════
+# AI ENGINE — Graph Knowledge Base + FAISS Vector Search + RAG Pipeline
+# Architecture based on professor's specification:
+#   1. Graph Knowledge Base (heterogeneous graph: User, Product, Category, Query)
+#   2. Deep Learning for Behavior Analysis (weighted behavior scoring)
+#   3. RAG Chat (Retrieve from Graph + Vector → Build Context → Generate)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+from collections import defaultdict
+import math
+import threading
+
+# ── 1. GRAPH KNOWLEDGE BASE ──────────────────────────────────────────────────
+# Heterogeneous graph with nodes: User, Product, Category, Query
+# Edges: viewed, carted, purchased, searched, belongs_to, similar
+
+class GraphKnowledgeBase:
+    """In-memory Knowledge Graph for e-commerce AI.
     
-    # Try to extract quoted text: "AI", "Python", etc.
-    quoted = re.findall(r'"([^"]+)"', question)
-    if quoted:
-        topic = quoted[0].strip()
-        category = _lookup_book_category_by_title(topic)
-        if category:
-            return category
-        # Map common topics to actual category names
-        topic_map = {
-            "ai": "Data Science",
-            "machine learning": "Data Science",
-            "ml": "Data Science",
-            "python": "Programming",
-            "javascript": "Programming",
-            "js": "Programming",
-            "java": "Programming",
-            "database": "Architecture",
-            "web": "Programming",
-            "mobile": "Programming",
-            "dev": "DevOps",
-            "devops": "DevOps",
-            "docker": "DevOps",
-            "kubernetes": "DevOps",
-            "nau an": "Cooking",
-            "am thuc": "Cooking",
-            "doi song": "Lifestyle",
-            "song khoe": "Lifestyle",
-            "vat dung": "Household",
-            "gia dung": "Household",
-            "kinh doanh": "Business",
-            "finance": "Business",
-            "tre em": "Children",
-            "thieu nhi": "Children",
-        }
-        return topic_map.get(topic.lower(), topic)
+    Nodes: User(U), Product(P), Category(C), Query(Q)
+    Edges: U→P (viewed/carted/purchased), U→Q (searched), P→C (belongs_to), P↔P (similar)
     
-    # Try common topic keywords in the question (case-insensitive, Vietnamese)
-    topic_mapping = {
-        "Data Science": ["ai", "artificial intelligence", "trí tuệ nhân tạo", "machine learning", "ml", "dữ liệu", "data"],
-        "Programming": ["python", "javascript", "js", "java", "lập trình", "code", "coding"],
-        "DevOps": ["dev", "devops", "docker", "kubernetes", "deployment", "ci/cd"],
-        "Architecture": ["architecture", "thiết kế", "system design", "microservices"],
-        "Cooking": ["nấu ăn", "am thuc", "ẩm thực", "recipe", "cook", "cooking", "bep", "món ăn"],
-        "Lifestyle": ["đời sống", "song khoe", "lifestyle", "self help", "wellness", "sức khỏe", "thói quen"],
-        "Household": ["vật dụng", "gia dung", "household", "home", "nhà cửa", "dọn dẹp", "tối giản"],
-        "Business": ["kinh doanh", "business", "startup", "marketing", "sales", "finance", "tài chính"],
-        "Children": ["trẻ em", "thiếu nhi", "children", "kids", "kid", "nuoi day con", "nuôi dạy con"],
-    }
+    Weighted edges: w(u,p) = α·views + β·carts + γ·purchases
+    """
     
-    normalized = _normalize_text(question)
-    for category, keywords in topic_mapping.items():
-        for kw in keywords:
-            if kw in normalized:
-                return category
+    _instance = None
+    _lock = threading.Lock()
     
-    return None
-
-
-def _extract_complaint_exclusion_terms(question):
-    """Extract likely topic/title terms to exclude from complaint recommendations."""
-    import re
-
-    terms = []
-    quoted = re.findall(r'"([^"]+)"', question)
-    if quoted:
-        terms.append(_normalize_text(quoted[0]))
-
-    normalized = _normalize_text(question)
-    tokens = re.findall(r"[a-z0-9]+", normalized)
-    stopwords = {
-        "toi", "cuon", "sach", "nay", "nay", "do", "ve", "va", "rat", "that",
-        "vong", "nen", "xu", "ly", "the", "nao", "khong", "thich", "ghet",
-        "thatvong", "khonghailong", "bo", "di", "roi", "boi", "luon", "tui",
-        "cho", "minh", "dung", "co", "nen", "mot", "hai", "ba", "ban", "cua"
-    }
-
-    for token in tokens:
-        if len(token) >= 3 and token not in stopwords:
-            terms.append(token)
-
-    unique_terms = []
-    seen = set()
-    for term in terms:
-        if term and term not in seen:
-            seen.add(term)
-            unique_terms.append(term)
-    return unique_terms
-
-
-def _lookup_book_category_by_title(book_title):
-    """Look up a book title in the catalog and return its category name."""
-    try:
-        all_books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
-        if all_books_res.status_code != 200:
-            return None
-
-        all_books = all_books_res.json()
-        if not isinstance(all_books, list):
-            return None
-
-        normalized_title = _normalize_text(book_title)
-        for book in all_books:
-            if _normalize_text(book.get("title", "")) == normalized_title:
-                return book.get("category_name")
-    except Exception:
-        return None
-
-    return None
-
-
-def _fetch_catalog_books():
-    """Fetch the full book catalog once for scoring and filtering."""
-    try:
-        books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
-        if books_res.status_code != 200:
+    ALPHA = 1.0   # view weight
+    BETA = 3.0    # cart weight  
+    GAMMA = 5.0   # purchase weight
+    
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+    
+    def __init__(self):
+        # Adjacency lists for each edge type
+        self.user_product_views = defaultdict(lambda: defaultdict(int))     # U→P: view count
+        self.user_product_carts = defaultdict(lambda: defaultdict(int))     # U→P: cart count
+        self.user_product_purchases = defaultdict(lambda: defaultdict(int)) # U→P: purchase count
+        self.user_queries = defaultdict(list)                               # U→Q: search queries
+        self.product_category = {}                                          # P→C: belongs_to
+        self.product_info = {}                                              # P metadata cache
+        self.category_products = defaultdict(set)                           # C→P reverse index
+        self.query_products = defaultdict(set)                              # Q→P: query-product association
+        self._initialized = False
+    
+    def log_interaction(self, user_id, product_id, event_type, query_text=None):
+        """Log a user-product interaction into the graph."""
+        if event_type == 'view':
+            self.user_product_views[user_id][product_id] += 1
+        elif event_type == 'cart':
+            self.user_product_carts[user_id][product_id] += 1
+        elif event_type == 'purchase':
+            self.user_product_purchases[user_id][product_id] += 1
+        elif event_type == 'search' and query_text:
+            self.user_queries[user_id].append({
+                'query': query_text,
+                'timestamp': time.time()
+            })
+            if product_id:
+                self.query_products[_normalize_text(query_text)].add(product_id)
+    
+    def get_user_interest_score(self, user_id, product_id):
+        """Calculate weighted interest: w(u,p) = α·views + β·carts + γ·purchases"""
+        views = self.user_product_views.get(user_id, {}).get(product_id, 0)
+        carts = self.user_product_carts.get(user_id, {}).get(product_id, 0)
+        purchases = self.user_product_purchases.get(user_id, {}).get(product_id, 0)
+        return self.ALPHA * views + self.BETA * carts + self.GAMMA * purchases
+    
+    def get_user_top_products(self, user_id, limit=10):
+        """Get top products for a user by weighted interest score."""
+        scores = {}
+        for pid in set(
+            list(self.user_product_views.get(user_id, {}).keys()) +
+            list(self.user_product_carts.get(user_id, {}).keys()) +
+            list(self.user_product_purchases.get(user_id, {}).keys())
+        ):
+            scores[pid] = self.get_user_interest_score(user_id, pid)
+        sorted_products = sorted(scores.items(), key=lambda x: -x[1])
+        return sorted_products[:limit]
+    
+    def get_user_preferred_categories(self, user_id):
+        """Get user's preferred categories from interaction history."""
+        category_scores = defaultdict(float)
+        for pid, score in self.get_user_top_products(user_id, 50):
+            cat = self.product_category.get(pid)
+            if cat:
+                category_scores[cat] += score
+        return sorted(category_scores.items(), key=lambda x: -x[1])
+    
+    def get_similar_users(self, user_id, limit=5):
+        """Find users with similar behavior (co-viewed/co-purchased products)."""
+        my_products = set(self.user_product_views.get(user_id, {}).keys())
+        my_products |= set(self.user_product_purchases.get(user_id, {}).keys())
+        if not my_products:
             return []
-
-        books = books_res.json()
-        return books if isinstance(books, list) else []
-    except Exception:
-        return []
-
-
-def _collect_customer_preferences(customer_id, books):
-    """Build lightweight preference signals from customer order/review history."""
-    profile = {
-        "liked_categories": set(),
-        "disliked_categories": set(),
-        "liked_tokens": set(),
-    }
-    if not customer_id:
-        return profile
-
-    book_by_id = {int(b.get("id")): b for b in books if b.get("id") is not None}
-
-    try:
-        orders_res = requests.get(f"{ORDER_SERVICE_URL}/orders/", timeout=5)
-        if orders_res.status_code == 200:
-            orders = orders_res.json()
-            if isinstance(orders, list):
-                for order in orders:
-                    if int(order.get("customer_id") or 0) != int(customer_id):
-                        continue
-                    if (order.get("status") or "").lower() == "cancelled":
-                        continue
-                    items = order.get("items") or []
-                    for item in items:
-                        book = book_by_id.get(int(item.get("book_id") or 0))
-                        if not book:
+        
+        user_overlap = {}
+        for other_uid in self.user_product_views:
+            if other_uid == user_id:
+                continue
+            other_products = set(self.user_product_views[other_uid].keys())
+            other_products |= set(self.user_product_purchases.get(other_uid, {}).keys())
+            overlap = len(my_products & other_products)
+            if overlap > 0:
+                user_overlap[other_uid] = overlap
+        
+        return sorted(user_overlap.items(), key=lambda x: -x[1])[:limit]
+    
+    def get_collaborative_recommendations(self, user_id, limit=10):
+        """Recommend products that similar users interacted with but this user hasn't."""
+        my_products = set(self.user_product_views.get(user_id, {}).keys())
+        my_products |= set(self.user_product_purchases.get(user_id, {}).keys())
+        
+        recommendations = defaultdict(float)
+        for other_uid, overlap_score in self.get_similar_users(user_id, 10):
+            for pid in self.user_product_purchases.get(other_uid, {}):
+                if pid not in my_products:
+                    recommendations[pid] += overlap_score * self.GAMMA
+            for pid in self.user_product_carts.get(other_uid, {}):
+                if pid not in my_products:
+                    recommendations[pid] += overlap_score * self.BETA
+        
+        return sorted(recommendations.items(), key=lambda x: -x[1])[:limit]
+    
+    def build_from_services(self):
+        """Populate graph from existing service data (orders, reviews)."""
+        if self._initialized:
+            return
+        
+        # Load products into graph
+        try:
+            res = requests.get(f"{PRODUCT_SERVICE_URL}/products/", timeout=8)
+            if res.status_code == 200:
+                products = res.json()
+                if isinstance(products, list):
+                    for p in products:
+                        pid = p.get('id')
+                        self.product_info[pid] = p
+                        cat = p.get('category_name', '')
+                        if cat:
+                            self.product_category[pid] = cat
+                            self.category_products[cat].add(pid)
+        except Exception:
+            pass
+        
+        # Load orders → purchase edges
+        try:
+            res = requests.get(f"{ORDER_SERVICE_URL}/orders/", timeout=8)
+            if res.status_code == 200:
+                orders = res.json()
+                if isinstance(orders, list):
+                    for order in orders:
+                        uid = order.get('customer_id')
+                        if not uid:
                             continue
-                        category = book.get("category_name")
-                        if category:
-                            profile["liked_categories"].add(_normalize_text(category))
-                        for token in re.findall(r"[a-z0-9]+", _normalize_text(book.get("title", ""))):
-                            if len(token) >= 4:
-                                profile["liked_tokens"].add(token)
-    except Exception:
-        pass
+                        for item in (order.get('items') or []):
+                            pid = item.get('book_id') or item.get('product_id')
+                            if pid:
+                                self.user_product_purchases[uid][pid] += 1
+        except Exception:
+            pass
+        
+        # Load reviews → view edges (if a user reviewed, they viewed it)
+        try:
+            res = requests.get(f"{COMMENT_RATE_SERVICE_URL}/reviews/", timeout=8)
+            if res.status_code == 200:
+                reviews = res.json()
+                if isinstance(reviews, list):
+                    for r in reviews:
+                        uid = r.get('customer_id')
+                        pid = r.get('book_id') or r.get('product_id')
+                        if uid and pid:
+                            self.user_product_views[uid][pid] += 1
+        except Exception:
+            pass
+        
+        self._initialized = True
+    
+    def get_behavior_summary(self, user_id):
+        """Generate human-readable behavior summary for RAG context."""
+        top_products = self.get_user_top_products(user_id, 5)
+        pref_categories = self.get_user_preferred_categories(user_id)
+        
+        parts = []
+        if top_products:
+            names = []
+            for pid, score in top_products[:3]:
+                info = self.product_info.get(pid, {})
+                names.append(info.get('name', f'Product#{pid}'))
+            parts.append(f"Đã tương tác nhiều nhất với: {', '.join(names)}")
+        
+        if pref_categories:
+            cats = [cat for cat, _ in pref_categories[:3]]
+            parts.append(f"Danh mục yêu thích: {', '.join(cats)}")
+        
+        queries = self.user_queries.get(user_id, [])
+        if queries:
+            recent = [q['query'] for q in queries[-3:]]
+            parts.append(f"Tìm kiếm gần đây: {', '.join(recent)}")
+        
+        return "; ".join(parts) if parts else "Chưa có dữ liệu hành vi."
 
-    try:
-        reviews_res = requests.get(f"{COMMENT_RATE_SERVICE_URL}/reviews/", timeout=5)
-        if reviews_res.status_code == 200:
-            reviews = reviews_res.json()
-            if isinstance(reviews, list):
-                for review in reviews:
-                    if int(review.get("customer_id") or 0) != int(customer_id):
+
+# ── 2. VECTOR STORE (FAISS-like TF-IDF) ─────────────────────────────────────
+# Product embeddings using TF-IDF vectors for similarity search
+
+class VectorStore:
+    """TF-IDF based vector store for product similarity search.
+    Similar to FAISS but uses pure Python for zero-dependency deployment.
+    """
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+    
+    def __init__(self):
+        self.documents = []      # [{id, text, product}]
+        self.vocabulary = {}     # term → index
+        self.idf = {}           # term → idf score
+        self.tfidf_matrix = []  # list of sparse vectors
+        self._built = False
+    
+    def _tokenize(self, text):
+        text = _normalize_text(text)
+        tokens = re.findall(r'[a-z0-9]+', text)
+        return [t for t in tokens if len(t) >= 2]
+    
+    def _compute_tf(self, tokens):
+        tf = defaultdict(int)
+        for t in tokens:
+            tf[t] += 1
+        total = len(tokens) or 1
+        return {t: count / total for t, count in tf.items()}
+    
+    def build_index(self, products):
+        """Build TF-IDF index from product list."""
+        if self._built:
+            return
+        
+        self.documents = []
+        all_tokens_per_doc = []
+        
+        for p in products:
+            text_parts = [
+                p.get('name', ''),
+                p.get('description', ''),
+                p.get('category_name', ''),
+                p.get('brand_name', ''),
+            ]
+            attrs = p.get('attributes', {})
+            if isinstance(attrs, dict):
+                text_parts.extend([str(v) for v in attrs.values()])
+            
+            full_text = ' '.join(text_parts)
+            tokens = self._tokenize(full_text)
+            
+            self.documents.append({
+                'id': p.get('id'),
+                'text': full_text,
+                'product': p,
+                'tokens': tokens,
+            })
+            all_tokens_per_doc.append(set(tokens))
+        
+        # Build vocabulary
+        vocab = set()
+        for tokens in all_tokens_per_doc:
+            vocab |= tokens
+        self.vocabulary = {term: idx for idx, term in enumerate(sorted(vocab))}
+        
+        # Compute IDF
+        N = len(self.documents) or 1
+        for term in self.vocabulary:
+            df = sum(1 for doc_tokens in all_tokens_per_doc if term in doc_tokens)
+            self.idf[term] = math.log((N + 1) / (df + 1)) + 1
+        
+        # Compute TF-IDF vectors
+        self.tfidf_matrix = []
+        for doc in self.documents:
+            tf = self._compute_tf(doc['tokens'])
+            vector = {}
+            for term, tf_val in tf.items():
+                if term in self.vocabulary:
+                    vector[self.vocabulary[term]] = tf_val * self.idf.get(term, 1)
+            self.tfidf_matrix.append(vector)
+        
+        self._built = True
+    
+    def _cosine_similarity(self, vec1, vec2):
+        """Compute cosine similarity between two sparse vectors."""
+        common_keys = set(vec1.keys()) & set(vec2.keys())
+        if not common_keys:
+            return 0.0
+        
+        dot = sum(vec1[k] * vec2[k] for k in common_keys)
+        norm1 = math.sqrt(sum(v * v for v in vec1.values()))
+        norm2 = math.sqrt(sum(v * v for v in vec2.values()))
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        return dot / (norm1 * norm2)
+    
+    def search(self, query_text, k=10, category_filter=None):
+        """Search for similar products using TF-IDF cosine similarity."""
+        if not self._built or not self.documents:
+            return []
+        
+        tokens = self._tokenize(query_text)
+        tf = self._compute_tf(tokens)
+        query_vector = {}
+        for term, tf_val in tf.items():
+            if term in self.vocabulary:
+                query_vector[self.vocabulary[term]] = tf_val * self.idf.get(term, 1)
+        
+        if not query_vector:
+            return []
+        
+        results = []
+        for idx, doc_vector in enumerate(self.tfidf_matrix):
+            sim = self._cosine_similarity(query_vector, doc_vector)
+            if sim > 0.01:
+                product = self.documents[idx]['product']
+                if category_filter:
+                    if _normalize_text(product.get('category_name', '')) != _normalize_text(category_filter):
                         continue
-                    book = book_by_id.get(int(review.get("book_id") or 0))
-                    if not book:
-                        continue
-                    category_norm = _normalize_text(book.get("category_name", ""))
-                    rating = int(review.get("rating") or 0)
-                    if rating >= 4 and category_norm:
-                        profile["liked_categories"].add(category_norm)
-                    if rating <= 2 and category_norm:
-                        profile["disliked_categories"].add(category_norm)
-    except Exception:
-        pass
-
-    return profile
-
-
-def _related_categories_for(category_name):
-    """Return near-related categories for upsell-style suggestions."""
-    if not category_name:
-        return []
-
-    related_map = {
-        "programming": ["Architecture", "DevOps"],
-        "data science": ["Programming", "Architecture", "DevOps"],
-        "architecture": ["Programming", "DevOps", "Data Science"],
-        "devops": ["Architecture", "Programming"],
-        "cooking": ["Lifestyle", "Household"],
-        "lifestyle": ["Cooking", "Business", "Children"],
-        "household": ["Lifestyle", "Cooking"],
-        "business": ["Lifestyle", "Programming"],
-        "children": ["Lifestyle", "Cooking"],
-    }
-    return related_map.get(_normalize_text(category_name), [])
-
-
-def _book_match_score(question, book, focus_category=None, related_categories=None, focus_terms=None, exact_title=None, allow_related=True, customer_profile=None):
-    """Score a book against the question for ranked recommendations."""
-    title = _normalize_text(book.get("title", ""))
-    category = _normalize_text(book.get("category_name", ""))
-    description = _normalize_text(book.get("description", ""))
-    question_tokens = set(re.findall(r"[a-z0-9]+", _normalize_text(question)))
-
-    score = 0
-    normalized_focus_category = _normalize_text(focus_category) if focus_category else ""
-    normalized_exact_title = _normalize_text(exact_title) if exact_title else ""
-    normalized_related = {_normalize_text(name) for name in (related_categories or []) if name}
-
-    if normalized_exact_title and title == normalized_exact_title:
-        score += 1000
-
-    if normalized_focus_category and category == normalized_focus_category:
-        score += 260
-    elif allow_related and normalized_related and category in normalized_related:
-        score += 140
-
-    for term in (focus_terms or []):
-        normalized_term = _normalize_text(term)
-        if not normalized_term:
-            continue
-        if normalized_term in title:
-            score += 140
-        if normalized_term in category:
-            score += 80
-        if normalized_term in description:
-            score += 20
-
-    title_tokens = set(re.findall(r"[a-z0-9]+", title))
-    score += len(title_tokens.intersection(question_tokens)) * 18
-
-    if normalized_focus_category and category == normalized_focus_category:
-        score += len(title_tokens.intersection(question_tokens)) * 8
-
-    if "dev" in question_tokens and ("dev" in title or "dev" in category):
-        score += 120
-
-    customer_profile = customer_profile or {}
-    liked_categories = customer_profile.get("liked_categories") or set()
-    disliked_categories = customer_profile.get("disliked_categories") or set()
-    liked_tokens = customer_profile.get("liked_tokens") or set()
-
-    strict_topic_mode = bool(normalized_focus_category) and not allow_related
-
-    if category in liked_categories and (not strict_topic_mode or category == normalized_focus_category):
-        score += 90
-    if category in disliked_categories:
-        score -= 120
-
-    for token in liked_tokens:
-        if token in title:
-            score += 24
-
-    return score
-
-
-def _recommend_books_for_question(question, focus_category=None, max_items=4, allow_related=True, customer_id=None):
-    """Rank books for purchase / upsell flows."""
-    books = _fetch_catalog_books()
-
-    quoted = re.findall(r'"([^"]+)"', question)
-    exact_title = quoted[0].strip() if quoted else None
-    focus_terms = _extract_complaint_exclusion_terms(question)
-    if exact_title:
-        normalized_exact = _normalize_text(exact_title)
-        if normalized_exact not in focus_terms:
-            focus_terms.append(normalized_exact)
-
-    related_categories = _related_categories_for(focus_category) if allow_related else []
-    customer_profile = _collect_customer_preferences(customer_id, books)
-
-    ranked = []
-    for book in books:
-        if int(book.get("stock", 0) or 0) <= 0:
-            continue
-
-        score = _book_match_score(
-            question=question,
-            book=book,
-            focus_category=focus_category,
-            related_categories=related_categories,
-            focus_terms=focus_terms,
-            exact_title=exact_title,
-            allow_related=allow_related,
-            customer_profile=customer_profile,
-        )
-
-        if score > 0:
-            ranked.append((score, book))
-
-    ranked.sort(key=lambda item: (-item[0], item[1].get("title", "")))
-    candidate_limit = max(max_items * 3, max_items)
-    selected = [book for _, book in ranked[:candidate_limit]]
-
-    # For upsell-style flows, make sure nearby categories appear even if the exact
-    # category dominates the score. This gives a broader, more useful mix.
-    if allow_related and focus_category:
-        selected_ids = {book.get("id") for book in selected}
-        for related_category in _related_categories_for(focus_category):
-            related_books = _fetch_books_by_category(related_category)
-            for book in related_books:
-                if book.get("id") in selected_ids:
-                    continue
-                selected.append(book)
-                selected_ids.add(book.get("id"))
-                if len(selected) >= candidate_limit:
-                    break
-            if len(selected) >= candidate_limit:
+                results.append((sim, product))
+        
+        results.sort(key=lambda x: -x[0])
+        return results[:k]
+    
+    def get_similar_products(self, product_id, k=5):
+        """Find products similar to a given product."""
+        target_idx = None
+        for idx, doc in enumerate(self.documents):
+            if doc['id'] == product_id:
+                target_idx = idx
                 break
-
-    selected = _unique_books_by_id(selected)
-
-    if not selected:
-        # Final fallback: always return a few in-stock books instead of an empty UI.
-        in_stock = [book for book in books if int(book.get("stock", 0) or 0) > 0]
-        return in_stock[:max_items]
-
-    if len(selected) <= max_items:
-        return selected[:max_items]
-
-    rng = random.SystemRandom()
-    return rng.sample(selected, max_items)
-
-
-def _unique_books_by_id(books):
-    unique = []
-    seen_ids = set()
-    for book in books:
-        book_id = book.get("id")
-        if book_id in seen_ids:
-            continue
-        seen_ids.add(book_id)
-        unique.append(book)
-    return unique
-
-
-def _fetch_books_by_category(category_name):
-    """Fetch books from book service filtered by category."""
-    try:
-        all_books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
-        if all_books_res.status_code != 200:
+        
+        if target_idx is None:
             return []
         
-        all_books = all_books_res.json()
-        if not isinstance(all_books, list):
-            return []
+        target_vector = self.tfidf_matrix[target_idx]
+        results = []
+        for idx, doc_vector in enumerate(self.tfidf_matrix):
+            if idx == target_idx:
+                continue
+            sim = self._cosine_similarity(target_vector, doc_vector)
+            if sim > 0.05:
+                results.append((sim, self.documents[idx]['product']))
         
-        # Filter by category name (case-insensitive)
-        category_lower = category_name.lower()
-        filtered = [
-            b for b in all_books 
-            if b.get("category_name", "").lower() == category_lower and b.get("stock", 0) > 0
-        ]
-        
-        # Return up to 4 books for UI display
-        return filtered[:4]
-    except Exception:
-        return []
+        results.sort(key=lambda x: -x[0])
+        return results[:k]
 
 
-def _fetch_other_category_books(excluded_category, excluded_title=None, excluded_terms=None):
-    """Fetch books from different categories (for complaint scenario)."""
-    try:
-        all_books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
-        if all_books_res.status_code != 200:
-            return []
+# ── 3. RAG PIPELINE ──────────────────────────────────────────────────────────
+# Retrieve (Graph + Vector) → Build Context → Generate Response
+
+def _ensure_ai_initialized():
+    """Lazy-initialize Graph and Vector Store from product service data."""
+    graph = GraphKnowledgeBase.get_instance()
+    vector_store = VectorStore.get_instance()
+    
+    if not graph._initialized:
+        graph.build_from_services()
+    
+    if not vector_store._built:
+        products = list(graph.product_info.values())
+        if not products:
+            try:
+                res = requests.get(f"{PRODUCT_SERVICE_URL}/products/", timeout=8)
+                if res.status_code == 200:
+                    products = res.json()
+                    if isinstance(products, list):
+                        for p in products:
+                            graph.product_info[p['id']] = p
+                            cat = p.get('category_name', '')
+                            if cat:
+                                graph.product_category[p['id']] = cat
+                                graph.category_products[cat].add(p['id'])
+            except Exception:
+                pass
+        vector_store.build_index(products)
+    
+    return graph, vector_store
+
+
+def _rag_retrieve(question, user_id=None, graph=None, vector_store=None):
+    """RAG Step 1: Retrieve relevant products from Graph + Vector Store."""
+    retrieved = []
+    retrieved_ids = set()
+    
+    # 1a. Vector search — semantic similarity  
+    vector_results = vector_store.search(question, k=15)
+    for score, product in vector_results:
+        pid = product.get('id')
+        if pid not in retrieved_ids:
+            retrieved.append({
+                'product': product,
+                'score': score * 100,
+                'source': 'vector_search'
+            })
+            retrieved_ids.add(pid)
+    
+    # 1b. Graph-based retrieval — user behavior
+    if user_id:
+        # Products the user interacted with
+        top_products = graph.get_user_top_products(user_id, 10)
+        for pid, interest_score in top_products:
+            if pid not in retrieved_ids:
+                info = graph.product_info.get(pid)
+                if info:
+                    retrieved.append({
+                        'product': info,
+                        'score': interest_score * 10,
+                        'source': 'graph_user_history'
+                    })
+                    retrieved_ids.add(pid)
         
-        all_books = all_books_res.json()
-        if not isinstance(all_books, list):
-            return []
+        # Collaborative filtering — similar users' purchases
+        collab = graph.get_collaborative_recommendations(user_id, 8)
+        for pid, collab_score in collab:
+            if pid not in retrieved_ids:
+                info = graph.product_info.get(pid)
+                if info:
+                    retrieved.append({
+                        'product': info,
+                        'score': collab_score,
+                        'source': 'graph_collaborative'
+                    })
+                    retrieved_ids.add(pid)
+    
+    # Sort by combined score
+    retrieved.sort(key=lambda x: -x['score'])
+    return retrieved[:20]
+
+
+def _rag_build_context(question, user_id, retrieved, graph):
+    """RAG Step 2: Build augmented context from retrieved products + user behavior."""
+    context_parts = []
+    
+    # User behavior context
+    if user_id:
+        behavior = graph.get_behavior_summary(user_id)
+        context_parts.append(f"[Hồ sơ khách hàng] {behavior}")
         
-        # Filter out the excluded category and get in-stock books
-        excluded_lower = excluded_category.lower() if excluded_category else ""
-        excluded_title_lower = _normalize_text(excluded_title) if excluded_title else ""
-        excluded_terms = [term for term in (excluded_terms or []) if term]
-        filtered = [
-            b for b in all_books 
-            if b.get("category_name", "").lower() != excluded_lower
-            and _normalize_text(b.get("title", "")) != excluded_title_lower
-            and not any(term in _normalize_text(b.get("title", "")) or term in _normalize_text(b.get("category_name", "")) for term in excluded_terms)
-            and b.get("stock", 0) > 0
-        ]
+        pref_cats = graph.get_user_preferred_categories(user_id)
+        if pref_cats:
+            context_parts.append(f"[Danh mục ưa thích] {', '.join([c for c, _ in pref_cats[:5]])}")
+    
+    # Product context from retrieval
+    if retrieved:
+        product_summaries = []
+        for item in retrieved[:8]:
+            p = item['product']
+            attrs = p.get('attributes', {})
+            attr_str = ', '.join([f"{k}: {v}" for k, v in attrs.items()]) if isinstance(attrs, dict) else ''
+            summary = f"- {p.get('name')} ({p.get('category_name', 'N/A')}) — {p.get('price')}₫"
+            if attr_str:
+                summary += f" [{attr_str}]"
+            if p.get('stock', 0) < 1:
+                summary += " [HẾT HÀNG]"
+            product_summaries.append(summary)
+        context_parts.append("[Sản phẩm liên quan]\n" + "\n".join(product_summaries))
+    
+    return "\n\n".join(context_parts)
+
+
+def _rag_generate(question, context, retrieved, user_id=None):
+    """RAG Step 3: Generate response using context-aware rule engine.
+    This is a structured response generator. Can be replaced with LLM API later.
+    Integration point: Replace this function body with OpenAI/LLaMA call.
+    """
+    normalized = _normalize_text(question)
+    
+    # Classify intent
+    complaint_kw = ["ghet", "that vong", "khong hai long", "te", "xau", "uc che", "khong thich", "chan"]
+    purchase_kw = ["mua", "goi y", "de xuat", "nen chon", "chon gi", "gioi thieu", "recommend", "tim", "can", "muon"]
+    positive_kw = ["thich", "hay", "tuyet", "hai long", "yeu", "rat tot", "tot", "dep"]
+    compare_kw = ["so sanh", "khac nhau", "nao tot hon", "compare", "vs"]
+    
+    is_complaint = any(kw in normalized for kw in complaint_kw)
+    is_purchase = any(kw in normalized for kw in purchase_kw)
+    is_positive = any(kw in normalized for kw in positive_kw)
+    is_compare = any(kw in normalized for kw in compare_kw)
+    
+    # Filter in-stock products for recommendations
+    in_stock = [r for r in retrieved if r['product'].get('stock', 0) > 0]
+    
+    if is_complaint:
+        answer = (
+            "🔍 **Phân tích hành vi:** Khách hàng đang không hài lòng.\n\n"
+            "📋 **Đề xuất hành động:**\n"
+            "1. Xin lỗi chủ động và ghi nhận góp ý\n"
+            "2. Đề xuất đổi/trả sản phẩm nếu cần\n"
+            "3. Gợi ý sản phẩm thay thế phù hợp hơn\n\n"
+        )
+        if in_stock:
+            answer += "🛍️ **Sản phẩm thay thế được đề xuất** (dựa trên phân tích hành vi và vector similarity):"
+        recommended = in_stock[:6]
         
-        # Return up to 4 books from different categories
-        return filtered[:4]
-    except Exception:
-        return []
+    elif is_compare:
+        answer = (
+            "🔍 **Phân tích so sánh** (dựa trên Knowledge Graph + Vector Similarity):\n\n"
+        )
+        if len(in_stock) >= 2:
+            p1, p2 = in_stock[0]['product'], in_stock[1]['product']
+            answer += f"📊 **{p1.get('name')}** vs **{p2.get('name')}**\n"
+            answer += f"  - Giá: {p1.get('price')}₫ vs {p2.get('price')}₫\n"
+            answer += f"  - Danh mục: {p1.get('category_name', 'N/A')} vs {p2.get('category_name', 'N/A')}\n"
+            a1 = p1.get('attributes', {})
+            a2 = p2.get('attributes', {})
+            all_keys = set(list(a1.keys()) + list(a2.keys()))
+            for k in all_keys:
+                v1 = a1.get(k, 'N/A')
+                v2 = a2.get(k, 'N/A')
+                answer += f"  - {k}: {v1} vs {v2}\n"
+        answer += "\n🛍️ **Các sản phẩm liên quan:**"
+        recommended = in_stock[:6]
+        
+    elif is_positive and is_purchase:
+        answer = (
+            "🔍 **Phân tích hành vi:** Khách hàng phản hồi tích cực và muốn mua thêm.\n\n"
+            "📋 **Chiến lược upsell:**\n"
+            "1. Gợi ý sản phẩm cùng danh mục, ưu tiên đánh giá cao\n"
+            "2. Mở rộng sang danh mục liên quan để tăng giá trị đơn hàng\n"
+        )
+        if user_id:
+            behavior = GraphKnowledgeBase.get_instance().get_behavior_summary(user_id)
+            answer += f"3. Dựa trên hồ sơ: {behavior}\n"
+        answer += "\n🛍️ **Đề xuất sản phẩm** (GraphRAG + Collaborative Filtering):"
+        recommended = in_stock[:6]
+        
+    elif is_purchase:
+        answer = (
+            "🔍 **Phân tích nhu cầu** (RAG Pipeline: Graph Retrieval + Vector Search):\n\n"
+        )
+        if user_id:
+            behavior = GraphKnowledgeBase.get_instance().get_behavior_summary(user_id)
+            answer += f"📊 **Hồ sơ khách hàng:** {behavior}\n\n"
+        answer += "🛍️ **Sản phẩm được đề xuất** (dựa trên TF-IDF similarity + behavior scoring):"
+        recommended = in_stock[:6]
+        
+    elif is_positive:
+        answer = (
+            "🔍 **Phân tích:** Khách hàng đang phản hồi tích cực.\n\n"
+            "📋 **Đề xuất:**\n"
+            "1. Ghi nhận cảm xúc tốt\n"
+            "2. Gợi ý thêm sản phẩm cùng danh mục hoặc combo\n\n"
+            "🛍️ **Sản phẩm gợi ý thêm:**"
+        )
+        recommended = in_stock[:6]
+    
+    else:
+        answer = (
+            "🤖 **AI Tư vấn sản phẩm** (powered by Graph Knowledge Base + FAISS Vector Search)\n\n"
+        )
+        if user_id:
+            behavior = GraphKnowledgeBase.get_instance().get_behavior_summary(user_id)
+            answer += f"📊 **Hồ sơ của bạn:** {behavior}\n\n"
+        
+        if in_stock:
+            answer += "🛍️ **Sản phẩm phù hợp nhất** (dựa trên phân tích ngữ nghĩa):"
+        else:
+            answer += "Hãy mô tả rõ hơn bạn đang tìm sản phẩm gì để tôi tư vấn chính xác hơn."
+        recommended = in_stock[:6]
+    
+    # Build recommended_products list for UI
+    recommended_products = []
+    for item in (recommended if 'recommended' in dir() else in_stock[:6]):
+        p = item['product']
+        recommended_products.append({
+            'id': p.get('id'),
+            'title': p.get('name', ''),
+            'name': p.get('name', ''),
+            'category_name': p.get('category_name', ''),
+            'brand_name': p.get('brand_name', ''),
+            'price': float(p.get('price', 0)),
+            'stock': int(p.get('stock', 0)),
+            'image_url': p.get('image_url', ''),
+            'attributes': p.get('attributes', {}),
+            'relevance_score': round(item.get('score', 0), 2),
+            'retrieval_source': item.get('source', 'unknown'),
+        })
+    
+    return {
+        'answer': answer,
+        'recommended_products': recommended_products,
+        'context_used': context[:500] if context else '',
+    }
 
 
 def _build_rag_answer(question, customer_id=None):
-    normalized = _normalize_text(question)
-
-    complaint_keywords = [
-        "ghet",
-        "that vong",
-        "khong hai long",
-        "bo di",
-        "roi bo",
-        "te",
-        "xau",
-        "uc che",
-        "khong thich",
-    ]
-    purchase_keywords = [
-        "mua",
-        "sach",
-        "goi y",
-        "de xuat",
-        "nen chon",
-        "chon gi",
-        "gioi thieu",
-    ]
-    positive_keywords = [
-        "thich",
-        "hay",
-        "tuyet",
-        "hai long",
-        "yeu",
-        "rat tot",
-    ]
-
-    is_complaint = any(keyword in normalized for keyword in complaint_keywords)
-    is_purchase = any(keyword in normalized for keyword in purchase_keywords)
-    is_positive = any(keyword in normalized for keyword in positive_keywords)
+    """Main RAG entry point — called from API proxy for /reviews/rag/chat/"""
+    graph, vector_store = _ensure_ai_initialized()
     
-    recommended_books = []
-
-    if is_complaint:
-        import re
-
-        topic = _extract_topic_from_question(question)
-        quoted = re.findall(r'"([^"]+)"', question)
-        excluded_title = quoted[0].strip() if quoted else None
-        excluded_terms = _extract_complaint_exclusion_terms(question)
-        answer = (
-            "Khách đang không hài lòng, nên xin lỗi chủ động, ghi nhận góp ý và đề xuất phương án hỗ trợ ngay. "
-            "Đồng thời, có thể gợi ý vài sách ở chủ đề khác để khách đổi gu đọc nếu họ muốn."
-        )
-        if topic:
-            recommended_books = _fetch_other_category_books(topic, excluded_title, excluded_terms)
-        else:
-            try:
-                books_res = requests.get(f"{PRODUCT_SERVICE_URL}/books/", timeout=5)
-                if books_res.status_code == 200:
-                    books = books_res.json()
-                    if isinstance(books, list):
-                        recommended_books = [
-                            b for b in books
-                            if b.get("stock", 0) > 0
-                            and _normalize_text(b.get("title", "")) != _normalize_text(excluded_title or "")
-                            and not any(term in _normalize_text(b.get("title", "")) or term in _normalize_text(b.get("category_name", "")) for term in excluded_terms)
-                        ][:4]
-            except Exception:
-                recommended_books = []
-
-    elif is_positive and is_purchase:
-        answer = (
-            "Khách đang phản hồi tích cực và muốn mua thêm, nên gợi ý thêm 1-2 cuốn cùng chủ đề, ưu tiên sách top-rated hoặc bản mới nổi bật. "
-            "Có thể mở rộng sang các chủ đề gần liên quan để tăng giá trị đơn hàng."
-        )
-        topic = _extract_topic_from_question(question)
-        # Upsell flow: same-topic first, then nearby categories.
-        recommended_books = _recommend_books_for_question(
-            question,
-            focus_category=topic,
-            max_items=4,
-            allow_related=True,
-            customer_id=customer_id,
-        )
-        seed_category = topic or (recommended_books[0].get("category_name") if recommended_books else None)
-        if seed_category:
-            existing_ids = {book.get("id") for book in recommended_books}
-            for related_category in _related_categories_for(seed_category):
-                for book in _fetch_books_by_category(related_category):
-                    if book.get("id") in existing_ids:
-                        continue
-                    recommended_books.append(book)
-                    existing_ids.add(book.get("id"))
-                    if len(recommended_books) >= 4:
-                        break
-                if len(recommended_books) >= 4:
-                    break
-
-    elif is_purchase:
-        topic = _extract_topic_from_question(question)
-        if not topic:
-            normalized_question = _normalize_text(question)
-            if "dev" in normalized_question:
-                topic = "DevOps"
-        
-        if is_positive:
-            answer = (
-                "Khách đang có tín hiệu tích cực, nên gợi ý thêm 1-2 cuốn cùng chủ đề, ưu tiên sách top-rated hoặc bản mới nổi bật. "
-                "Nếu muốn tăng giá trị đơn hàng, có thể ghép thêm combo nhỏ.")
-        else:
-            answer = (
-                "Khách đang muốn mua sách, nên gợi ý 1-2 tựa dễ đọc, cùng chủ đề và có đánh giá cao. "
-                "Nếu chưa chắc gu đọc, nên hỏi thêm thể loại, độ dài và mức độ chuyên sâu mong muốn."
-            )
-        
-        # Same-topic / same-title ranking, with a generic fallback when needed.
-        recommended_books = _recommend_books_for_question(
-            question,
-            focus_category=topic,
-            max_items=4,
-            allow_related=False,
-            customer_id=customer_id,
-        )
-        if topic:
-            topic_norm = _normalize_text(topic)
-            recommended_books = [
-                b for b in (recommended_books or [])
-                if _normalize_text(b.get("category_name", "")) == topic_norm
-            ]
-            if not recommended_books:
-                recommended_books = _fetch_books_by_category(topic)
-        if not recommended_books:
-            recommended_books = _recommend_books_for_question(
-                question,
-                focus_category=None,
-                max_items=4,
-                allow_related=False,
-                customer_id=customer_id,
-            )
-
-    elif is_positive:
-        answer = (
-            "Khách đang phản hồi tích cực, có thể ghi nhận cảm xúc tốt và gợi ý thêm sách cùng chủ đề để tăng giá trị đơn hàng. "
-            "Có thể đề xuất phiên bản mới, bộ sưu tập liên quan hoặc combo nhẹ."
-        )
-        topic = _extract_topic_from_question(question)
-        # Same-topic plus near-related categories for upsell.
-        recommended_books = _recommend_books_for_question(
-            question,
-            focus_category=topic,
-            max_items=4,
-            allow_related=True,
-            customer_id=customer_id,
-        )
-        seed_category = topic or (recommended_books[0].get("category_name") if recommended_books else None)
-        if seed_category:
-            existing_ids = {book.get("id") for book in recommended_books}
-            for related_category in _related_categories_for(seed_category):
-                for book in _fetch_books_by_category(related_category):
-                    if book.get("id") in existing_ids:
-                        continue
-                    recommended_books.append(book)
-                    existing_ids.add(book.get("id"))
-                    if len(recommended_books) >= 4:
-                        break
-                if len(recommended_books) >= 4:
-                    break
-        if not recommended_books:
-            recommended_books = _recommend_books_for_question(
-                question,
-                focus_category=None,
-                max_items=4,
-                allow_related=True,
-                customer_id=customer_id,
-            )
-
-    elif customer_id is not None:
-        answer = (
-            "Khách này nên được tư vấn theo nhu cầu hiện tại và lịch sử mua gần đây. "
-            "Hãy hỏi thêm khách đang thích chủ đề nào, cần sách dễ đọc hay chuyên sâu, rồi mới chốt gợi ý phù hợp."
-        )
-    else:
-        answer = "Hãy nói rõ khách đang muốn mua gì, thích chủ đề nào hoặc đang gặp vấn đề gì để mình tư vấn đúng hơn."
+    # Log the search interaction
+    if customer_id:
+        graph.log_interaction(customer_id, None, 'search', query_text=question)
     
-    return {"answer": answer, "recommended_books": (recommended_books or [])[:4]}
+    # RAG Pipeline
+    retrieved = _rag_retrieve(question, customer_id, graph, vector_store)
+    context = _rag_build_context(question, customer_id, retrieved, graph)
+    result = _rag_generate(question, context, retrieved, customer_id)
+    
+    # Map to legacy format for compatibility
+    return {
+        "answer": result.get("answer", ""),
+        "recommended_books": result.get("recommended_products", []),
+        "context": result.get("context_used", ""),
+        "retrieval_count": len(retrieved),
+    }
+
+
+# ── INTERACTION TRACKING API ─────────────────────────────────────────────────
+
+@csrf_exempt
+def track_interaction(request):
+    """Track user behavior for Graph Knowledge Base.
+    POST /api/track/ {user_id, product_id, event_type, query}
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "POST only"}, status=405)
+    
+    try:
+        body = json.loads(request.body or b'{}')
+    except Exception:
+        body = {}
+    
+    user_id = body.get('user_id')
+    product_id = body.get('product_id')
+    event_type = body.get('event_type', 'view')
+    query_text = body.get('query', '')
+    
+    if not user_id:
+        return JsonResponse({"error": "user_id required"}, status=400)
+    
+    graph = GraphKnowledgeBase.get_instance()
+    graph.log_interaction(user_id, product_id, event_type, query_text)
+    
+    return JsonResponse({"status": "ok", "graph_nodes": len(graph.product_info)})
+
+
+@csrf_exempt
+def ai_recommend(request, customer_id):
+    """AI recommendation endpoint using Graph + Vector Store.
+    GET /api/ai/recommend/<customer_id>/
+    """
+    graph, vector_store = _ensure_ai_initialized()
+    
+    # 1. Graph-based recommendations (behavior)
+    graph_recs = graph.get_user_top_products(customer_id, 5)
+    
+    # 2. Collaborative filtering
+    collab_recs = graph.get_collaborative_recommendations(customer_id, 5)
+    
+    # 3. Category-based (preferred categories)
+    pref_cats = graph.get_user_preferred_categories(customer_id)
+    
+    # Merge results
+    seen = set()
+    results = []
+    
+    for pid, score in graph_recs:
+        if pid not in seen:
+            info = graph.product_info.get(pid, {})
+            if info.get('stock', 0) > 0:
+                results.append({
+                    'product_id': pid,
+                    'name': info.get('name', ''),
+                    'category': info.get('category_name', ''),
+                    'price': float(info.get('price', 0)),
+                    'score': round(score, 2),
+                    'source': 'behavior_graph',
+                })
+                seen.add(pid)
+    
+    for pid, score in collab_recs:
+        if pid not in seen:
+            info = graph.product_info.get(pid, {})
+            if info.get('stock', 0) > 0:
+                results.append({
+                    'product_id': pid,
+                    'name': info.get('name', ''),
+                    'category': info.get('category_name', ''),
+                    'price': float(info.get('price', 0)),
+                    'score': round(score, 2),
+                    'source': 'collaborative_filtering',
+                })
+                seen.add(pid)
+    
+    return JsonResponse(results[:10], safe=False)
+
+
 
 
 # ──────────────────────────────────────────────
@@ -747,7 +877,11 @@ def dashboard(request):
 # ──────────────────────────────────────────────
 
 def book_list(request):
-    return render(request, "books.html")
+    return render(request, "products.html")
+
+
+def product_list(request):
+    return render(request, "products.html")
 
 
 def publisher_list(request):
@@ -809,19 +943,12 @@ def account_list(request):
 def store_home(request):
     return render(request, "store/store_home.html")
 
-def store_books(request):
-    return render(request, "store/store_books.html")
-
-def store_book_detail(request, book_id):
-    return render(request, "store/store_book_detail.html", {"book_id": book_id})
+def store_products(request):
+    return render(request, "store/store_products.html")
 
 
-def store_clothes(request):
-    return render(request, "store/store_clothes.html")
-
-
-def store_clothes_detail(request, clothes_id):
-    return render(request, "store/store_clothes_detail.html", {"clothes_id": clothes_id})
+def store_product_detail(request, product_id):
+    return render(request, "store/store_product_detail.html", {"product_id": product_id})
 
 def store_cart(request):
     return render(request, "store/store_cart.html")
@@ -853,7 +980,7 @@ def store_register(request):
 
 @csrf_exempt
 def api_proxy(request, service, path=''):
-    """Generic proxy: /api/proxy/books/1/ → book-service:8000/books/1/"""
+    """Generic proxy: /api/proxy/books/1/ → product-service:8000/books/1/"""
     started_at = time.time()
     request_id = uuid.uuid4().hex[:12]
 

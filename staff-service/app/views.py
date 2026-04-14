@@ -5,7 +5,7 @@ from .models import Staff
 from .serializers import StaffSerializer
 import requests
 
-BOOK_SERVICE_URL = "http://book-service:8000"
+BOOK_SERVICE_URL = "http://product-service:8000"
 
 
 class StaffListCreate(APIView):

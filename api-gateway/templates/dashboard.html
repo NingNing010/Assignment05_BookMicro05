@@ -151,7 +151,7 @@ async function loadDashboard() {
                 <tr style="cursor:pointer" onclick="openBookDetail(${b.id})">
                     <td>${b.title}</td>
                     <td>${b.author}</td>
-                    <td><span class="tag tag-green">$${b.price}</span></td>
+                    <td><span class="tag tag-green">${Number(b.price || 0).toLocaleString('vi-VN')} ₫</span></td>
                     <td>${b.stock}</td>
                     <td>${b.category_name || '—'}</td>
                     <td>${b.publisher_name || '—'}</td>

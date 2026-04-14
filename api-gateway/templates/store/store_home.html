@@ -209,11 +209,11 @@
         <div class="hero-text">
             <div class="hero-badge">⚡ Microservices Architecture</div>
             <h1>
-                Khám Phá Sách & Quần Áo<br>
+                Khám Phá Hàng Ngàn Sản Phẩm<br>
                 <span class="highlight">Không Giới Hạn</span>
             </h1>
             <p class="hero-desc">
-                Hàng ngàn đầu sách và quần áo hấp dẫn, giao hàng nhanh cả nước.<br>
+                Hơn 15 danh mục sản phẩm từ Sách, Công nghệ đến Thời trang & Nội thất.<br>
                 Tìm sản phẩm bạn yêu thích ngay hôm nay!
             </p>
             <a href="#all-products" class="hero-cta">🔍 Xem sản phẩm ngay</a>
@@ -252,12 +252,8 @@
 <!-- Search Bar -->
 <div class="search-section">
     <div class="search-bar">
-        <select id="productTypeFilter" onchange="loadData()">
-            <option value="books">Sách</option>
-            <option value="clothes">Quần áo</option>
-        </select>
-        <input type="text" id="searchInput" placeholder="Tìm kiếm sản phẩm theo tên..." onkeydown="if(event.key==='Enter')searchProducts()">
-        <select id="categoryFilter" style="display:none">
+        <input type="text" id="searchInput" placeholder="Tìm kiếm sản phẩm theo tên, thương hiệu, tác giả..." onkeydown="if(event.key==='Enter')searchProducts()">
+        <select id="categoryFilter">
             <option value="">Tất cả danh mục</option>
         </select>
         <button onclick="searchProducts()">🔍 Tìm kiếm</button>
@@ -283,45 +279,26 @@
 <script>
     let allProducts = [];
     let categories = [];
-    let currentProductType = 'books';
-
-    function syncSearchUI() {
-        const typeSel = document.getElementById('productTypeFilter');
-        currentProductType = typeSel?.value || 'books';
-        const categorySel = document.getElementById('categoryFilter');
-        const input = document.getElementById('searchInput');
-        const showCategories = currentProductType === 'books';
-        categorySel.style.display = showCategories ? 'inline-flex' : 'none';
-        input.placeholder = showCategories
-            ? 'Tìm kiếm sách theo tên, tác giả...'
-            : 'Tìm kiếm quần áo theo tên, thương hiệu, màu sắc...';
-        if (!showCategories) {
-            categorySel.value = '';
-        }
-    }
 
     async function loadData() {
-        syncSearchUI();
         try {
-            const productRes = await fetch(currentProductType === 'books' ? '/api/proxy/books/' : '/api/proxy/clothes/');
+            const productRes = await fetch('/api/proxy/products/');
             allProducts = await productRes.json();
             if (!Array.isArray(allProducts)) allProducts = [];
 
-            if (currentProductType === 'books') {
-                const catsRes = await fetch('/api/proxy/categories/');
-                categories = await catsRes.json();
-                const sel = document.getElementById('categoryFilter');
-                sel.innerHTML = '<option value="">Tất cả danh mục</option>';
-                (Array.isArray(categories) ? categories : []).forEach(c => {
-                    const opt = document.createElement('option');
-                    opt.value = c.id;
-                    opt.textContent = c.name;
-                    sel.appendChild(opt);
-                });
-            }
+            const catsRes = await fetch('/api/proxy/categories/');
+            categories = await catsRes.json();
+            const sel = document.getElementById('categoryFilter');
+            sel.innerHTML = '<option value="">Tất cả danh mục</option>';
+            (Array.isArray(categories) ? categories : []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                sel.appendChild(opt);
+            });
 
             document.getElementById('heroBookCount').textContent = allProducts.length + '+';
-            renderProducts(allProducts);
+            renderProducts(allProducts.slice(0, 30)); // Display the first 30 on home
         } catch(e) {
             document.getElementById('booksGrid').innerHTML = `
                 <div class="empty-state" style="grid-column:1/-1">
@@ -333,23 +310,16 @@
         }
     }
 
-    function getEncodedProductId(product) {
-        return currentProductType === 'clothes' ? (CLOTHES_ID_OFFSET + Number(product.id)) : Number(product.id);
-    }
-
     function renderProducts(products) {
         const grid = document.getElementById('booksGrid');
         const title = document.getElementById('productsTitle');
-        const isClothes = currentProductType === 'clothes';
-        title.textContent = isClothes ? 'Tất Cả Quần Áo' : 'Tất Cả Sách';
-        document.getElementById('bookCountText').textContent = `${products.length} ${isClothes ? 'sản phẩm' : 'tựa sách'} hiện có`;
+        document.getElementById('bookCountText').textContent = `${products.length} sản phẩm hiển thị`;
 
         if (products.length === 0) {
             grid.innerHTML = `
                 <div class="empty-state" style="grid-column:1/-1">
-                    <div class="empty-icon">${isClothes ? '👕' : '📚'}</div>
-                    <div class="empty-title">Không tìm thấy ${isClothes ? 'quần áo' : 'sách'}</div>
-                    <div class="empty-desc">Thử tìm kiếm với từ khóa khác</div>
+                    <div class="empty-icon">🛍️</div>
+                    <div class="empty-title">Không tìm thấy sản phẩm</div>
                 </div>
             `;
             return;
@@ -358,25 +328,23 @@
         grid.innerHTML = products.map((p, i) => {
             const stockClass = p.stock > 5 ? 'in-stock' : p.stock > 0 ? 'low-stock' : 'out-of-stock';
             const stockText = p.stock > 5 ? 'Còn hàng' : p.stock > 0 ? `Còn ${p.stock}` : 'Hết hàng';
-            const encodedId = getEncodedProductId(p);
-            const title = isClothes ? (p.name || `Quần áo #${encodedId}`) : p.title;
-            const subtitle = isClothes ? `🏷️ ${p.brand || '—'} • ${p.size || '—'} • ${p.color || '—'}` : `✍️ ${p.author || '—'}`;
-            const detailUrl = isClothes ? `/store/clothes/${encodedId}/` : `/store/book/${encodedId}/`;
+            const name = p.name || p.title;
+            const subtitle = p.brand_name ? `🏢 ${p.brand_name}` : (p.author ? `✍️ ${p.author}` : `📌 ${p.category_name||''}`);
 
             return `
-                <div class="book-card" onclick="window.location='${detailUrl}'">
+                <div class="book-card" onclick="window.location.href='/store/product/${p.id}/'">
                     <div class="book-card-cover ${gradClass(i)}">
-                        ${p.image_url ? `<img src="${p.image_url}" alt="${title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : ''}
-                        <div class="book-icon" style="display:${p.image_url ? 'none' : 'flex'}">${isClothes ? '👕' : '📖'}</div>
-                        ${isClothes ? '' : (p.category_name ? `<span class="category-tag">${p.category_name}</span>` : '')}
+                        ${p.image_url ? `<img src="${p.image_url}" alt="${name}" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` : ''}
+                        <div class="book-icon" style="display:${p.image_url ? 'none' : 'flex'}">🛍️</div>
+                        ${p.category_name ? `<span class="category-tag">${p.category_name}</span>` : ''}
                         <span class="stock-tag ${stockClass}">${stockText}</span>
                     </div>
                     <div class="book-card-body">
-                        <div class="book-card-title">${title}</div>
+                        <div class="book-card-title">${name}</div>
                         <div class="book-card-author">${subtitle}</div>
                         <div class="book-card-footer">
                             <div class="book-card-price">${formatPrice(p.price)} <span class="currency">₫</span></div>
-                            <button class="btn-add-cart" ${p.stock < 1 ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''} onclick="event.stopPropagation();addToCart(${encodedId})">${p.stock < 1 ? 'Hết hàng' : '🛒 Thêm'}</button>
+                            <button class="btn-add-cart" ${p.stock < 1 ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''} onclick="event.stopPropagation();addToCart(${p.id})">${p.stock < 1 ? 'Hết hàng' : '🛒 Thêm'}</button>
                         </div>
                     </div>
                 </div>
@@ -387,19 +355,16 @@
     function searchProducts() {
         const q = document.getElementById('searchInput').value.trim().toLowerCase();
         const cat = document.getElementById('categoryFilter').value;
-        const isClothes = currentProductType === 'clothes';
 
         let filtered = allProducts;
         if (q) {
             filtered = filtered.filter(p => {
-                const haystack = isClothes
-                    ? [p.name, p.brand, p.size, p.color, p.description].join(' ').toLowerCase()
-                    : [p.title, p.author, p.description].join(' ').toLowerCase();
+                const haystack = [p.name, p.title, p.brand_name, p.author, p.description, p.category_name].join(' ').toLowerCase();
                 return haystack.includes(q);
             });
         }
-        if (!isClothes && cat) {
-            filtered = filtered.filter(b => String(b.category) === cat || String(b.category_name) === document.getElementById('categoryFilter').selectedOptions[0]?.text);
+        if (cat) {
+            filtered = filtered.filter(b => b.category_name === cat);
         }
         renderProducts(filtered);
     }
@@ -411,9 +376,9 @@
             return;
         }
 
-        const product = (allProducts || []).find(p => Number(currentProductType === 'clothes' ? CLOTHES_ID_OFFSET + Number(p.id) : p.id) === Number(bookId));
+        const product = (allProducts || []).find(p => Number(p.id) === Number(bookId));
         if (product && Number(product.stock || 0) < 1) {
-            showToast(currentProductType === 'clothes' ? 'Quần áo đã hết hàng, không thể thêm vào giỏ' : 'Sách đã hết hàng, không thể thêm vào giỏ', 'error');
+            showToast('Sản phẩm đã hết hàng, không thể thêm vào giỏ', 'error');
             return;
         }
 

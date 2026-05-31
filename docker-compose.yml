@@ -4,6 +4,17 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: bookstore_product
+      POSTGRES_USER: bookstore_pg
+      POSTGRES_PASSWORD: pg_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
       
 
   auth-service:
@@ -26,11 +37,13 @@ services:
     ports:
       - "8002:8000"
     environment:
-      - DB_HOST=host.docker.internal
-      - DB_PORT=3306
-      - DB_USER=bookstore_user
-      - DB_PASSWORD=mattroi010
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=bookstore_pg
+      - DB_PASSWORD=pg_password
       - DB_NAME=bookstore_product
+    depends_on:
+      - postgres
 
   cart-service:
     build: ./cart-service
@@ -176,3 +189,6 @@ services:
       - pay-service
       - comment-rate-service
       - recommender-ai-service
+
+volumes:
+  postgres_data:

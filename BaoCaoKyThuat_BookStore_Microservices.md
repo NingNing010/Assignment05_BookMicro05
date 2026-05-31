@@ -75,7 +75,7 @@ Hệ thống tuân theo mô hình **Microservice Architecture** với các đặ
 - **Single Responsibility**: Mỗi service chỉ đảm nhận một nghiệp vụ
 - **API Gateway Pattern**: Mọi request từ client đều đi qua API Gateway
 - **Service-to-Service Communication**: Các service giao tiếp qua HTTP REST API (synchronous)
-- **Database per Service**: Mỗi service sở hữu SQLite database riêng biệt
+- **Database per Service**: Tách DB theo nghiệp vụ, trong đó `auth/account` dùng MySQL và `book/product` dùng PostgreSQL
 
 ### 2.2. Sơ đồ kiến trúc tổng quan
 
@@ -147,8 +147,8 @@ Mỗi microservice tuân theo kiến trúc phân lớp tiêu chuẩn:
 └─────────────┼───────────────┘
               │ persists
     ┌─────────▼──────────┐
-    │  <<database>>      │
-    │  SQLite (db.sqlite3)│
+    │  <<database>>       │
+    │  MySQL / PostgreSQL │
     └────────────────────┘
 ```
 
@@ -164,7 +164,8 @@ Mỗi microservice tuân theo kiến trúc phân lớp tiêu chuẩn:
 | **Django** | 5.x | Web framework |
 | **Django REST Framework** | 3.x | RESTful API framework |
 | **Requests** | latest | HTTP client cho inter-service communication |
-| **SQLite** | built-in | Database cho mỗi service |
+| **MySQL** | 8.x | Database cho `auth/account` và các service giao dịch |
+| **PostgreSQL** | 15.x | Database cho `book/product` để hỗ trợ dữ liệu linh hoạt |
 
 ### 3.2. Frontend
 
@@ -744,7 +745,13 @@ Hệ thống có **2 giao diện** riêng biệt, cùng phục vụ từ API Gat
 
 ### 9.1. Database per Service Pattern
 
-Mỗi microservice có **SQLite database riêng** (`db.sqlite3`), đảm bảo:
+Mỗi microservice có database riêng theo nguyên tắc **Database per Service**. Theo định hướng triển khai của hệ thống:
+- **`auth/account` sử dụng MySQL**
+- **`book/product` sử dụng PostgreSQL**
+
+Các service còn lại có thể dùng MySQL hoặc PostgreSQL tùy đặc thù dữ liệu, nhưng vẫn phải đảm bảo không truy cập trực tiếp DB của service khác.
+
+Cách tách này đảm bảo:
 - **Data isolation**: Không service nào truy cập trực tiếp database của service khác
 - **Independent deployment**: Mỗi service có thể migrate schema độc lập
 - **Loose coupling**: Thay đổi schema 1 service không ảnh hưởng service khác
@@ -1228,7 +1235,7 @@ Pha 4 (Operational Excellence):
 
 ### 14.3. Hạn chế
 
-- Sử dụng **SQLite** (không phù hợp production, nên dùng PostgreSQL/MySQL)
+- Cần đồng bộ triệt để cấu hình môi trường để luôn giữ đúng quy ước: `auth/account` dùng MySQL, `book/product` dùng PostgreSQL
 - Chưa có **authentication/authorization** đầy đủ (JWT tokens, OAuth2)
 - Sử dụng **Django development server** (nên dùng Gunicorn + Nginx)
 - **Synchronous communication** only (chưa có message queue như RabbitMQ/Kafka)
@@ -1240,7 +1247,7 @@ Pha 4 (Operational Excellence):
 
 ### 14.4. Hướng phát triển
 
-- Chuyển sang **PostgreSQL** cho production database
+- Chuẩn hóa kiến trúc DB production theo chuẩn đã chọn: `auth/account` chạy MySQL, `book/product` chạy PostgreSQL
 - Thêm **JWT Authentication** middleware cho tất cả API endpoints
 - Triển khai **message queue** (RabbitMQ) cho asynchronous events (order placed → payment + shipping)
 - Thêm **Nginx** reverse proxy và **Gunicorn** WSGI server

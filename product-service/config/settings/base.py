@@ -5,9 +5,6 @@ DDD Architecture — Catalog Bounded Context.
 
 from pathlib import Path
 import os
-import pymysql
-
-pymysql.install_as_MySQLdb()
 
 # ── Paths ───────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -62,13 +59,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # ── Database ────────────────────────────────────
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME', 'bookstore_product'),
-        'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'mattroi010'),
-        'HOST': os.getenv('DB_HOST', 'host.docker.internal'),
-        'PORT': os.getenv('DB_PORT', '3306'),
-        'OPTIONS': {'charset': 'utf8mb4'},
+        'USER': os.getenv('DB_USER', 'bookstore_pg'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'pg_password'),
+        'HOST': os.getenv('DB_HOST', 'postgres'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 

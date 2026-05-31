@@ -1,4 +1,4 @@
 django
 djangorestframework
-PyMySQL
+psycopg2-binary
 cryptography
